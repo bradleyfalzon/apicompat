@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
+	"go/printer"
+	"go/token"
 	"log"
 	"reflect"
 	"strings"
@@ -51,6 +54,28 @@ type change struct {
 	summary    string
 	before     ast.Decl
 	after      ast.Decl
+}
+
+func (c change) String() string {
+	fset := &token.FileSet{} // only require non-nil fset
+	pcfg := printer.Config{Mode: printer.RawFormat, Indent: 1}
+
+	buf := bytes.NewBufferString("")
+	if c.op == opChange {
+		fmt.Fprintf(buf, "%s (%s - %s)\n", c.op, c.changeType, c.summary)
+	} else {
+		fmt.Fprintln(buf, c.op)
+	}
+
+	if c.before != nil {
+		pcfg.Fprint(buf, fset, c.before)
+		fmt.Fprintln(buf)
+	}
+	if c.after != nil {
+		pcfg.Fprint(buf, fset, c.after)
+		fmt.Fprintln(buf)
+	}
+	return buf.String()
 }
 
 // decls is a map of an identifier to actual ast, where the id is a unique

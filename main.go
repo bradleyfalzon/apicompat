@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"go/ast"
 	"go/parser"
-	"go/printer"
 	"go/token"
 	"log"
-	"os"
 )
 
 func main() {
@@ -32,31 +30,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fset := token.NewFileSet() // only require non-nil fset
-	pcfg := printer.Config{Mode: printer.RawFormat, Indent: 1}
 	for pkgName, decls := range oldDecls {
 		log.Printf("Processing pkg %s with %d declarations", pkgName, len(decls))
-
 		if _, ok := newDecls[pkgName]; ok {
 			changes := diff(decls, newDecls[pkgName])
-
 			for _, change := range changes {
-
-				if change.op == opChange {
-					fmt.Printf("%s (%s - %s)\n", change.op, change.changeType, change.summary)
-				} else {
-					fmt.Println(change.op)
-				}
-
-				if change.before != nil {
-					pcfg.Fprint(os.Stdout, fset, change.before)
-					fmt.Println()
-				}
-				if change.after != nil {
-					pcfg.Fprint(os.Stdout, fset, change.after)
-					fmt.Println()
-				}
-				fmt.Println()
+				fmt.Println(change)
 			}
 		}
 	}
