@@ -8,10 +8,49 @@ import (
 	"strings"
 )
 
+type changeType uint8
+
+const (
+	changeNone changeType = iota
+	changeNonBreaking
+	changeBreaking
+)
+
+func (c changeType) String() string {
+	switch c {
+	case changeNone:
+		return "no change"
+	case changeNonBreaking:
+		return "non-breaking change"
+	}
+	return "breaking change"
+}
+
+type operation uint8
+
+const (
+	opAdd operation = iota
+	opRemove
+	opChange
+)
+
+func (op operation) String() string {
+	switch op {
+	case opAdd:
+		return "added"
+	case opRemove:
+		return "removed"
+	}
+	return "changed"
+}
+
 // change is the ast declaration containing the before and after
 type change struct {
-	before ast.Decl
-	after  ast.Decl
+	op         operation
+	changeType changeType
+	summary    string
+	before     ast.Decl
+	after      ast.Decl
 }
 
 // decls is a map of an identifier to actual ast, where the id is a unique
@@ -33,22 +72,29 @@ func diff(bdecls map[string]ast.Decl, adecls map[string]ast.Decl) (changes []cha
 	for id, decl := range bdecls {
 		if _, ok := adecls[id]; !ok {
 			// in before, not in after, therefore it was removed
-			changes = append(changes, change{before: decl})
+			changes = append(changes, change{op: opRemove, before: decl})
 			continue
 		}
 
 		// in before and in after, check if there's a difference
-		if equal(bdecls[id], adecls[id]) {
-			// no changes
+		changeType, summary := compareDecl(bdecls[id], adecls[id])
+		if changeType == changeNone {
 			continue
 		}
-		changes = append(changes, change{before: decl, after: adecls[id]})
+
+		changes = append(changes, change{
+			op:         opChange,
+			changeType: changeType,
+			summary:    summary,
+			before:     decl,
+			after:      adecls[id]},
+		)
 	}
 
 	for id, decl := range adecls {
 		if _, ok := bdecls[id]; !ok {
 			// in after, not in before, therefore it was added
-			changes = append(changes, change{after: decl})
+			changes = append(changes, change{op: opAdd, after: decl})
 		}
 	}
 
@@ -58,19 +104,19 @@ func diff(bdecls map[string]ast.Decl, adecls map[string]ast.Decl) (changes []cha
 // equal compares two declarations and returns true if they do not have
 // incompatible changes. For example, comments aren't compared, names of
 // arguments aren't compared etc.
-func equal(before, after ast.Decl) bool {
+func compareDecl(before, after ast.Decl) (changeType, string) {
 	// compare types, ignore comments etc, so reflect.DeepEqual isn't good enough
 
 	if reflect.TypeOf(before) != reflect.TypeOf(after) {
 		// Declaration type changed, such as GenDecl to FuncDecl (eg var/const to func)
-		return false
+		return changeBreaking, "changed declaration"
 	}
 
 	switch before.(type) {
 	case *ast.GenDecl:
 		if reflect.TypeOf(before.(*ast.GenDecl).Specs[0]) != reflect.TypeOf(after.(*ast.GenDecl).Specs[0]) {
 			// Spec changed, such as ValueSpec to TypeSpec (eg var/const to struct)
-			return false
+			return changeBreaking, "changed spec"
 		}
 
 		switch before.(*ast.GenDecl).Specs[0].(type) {
@@ -78,14 +124,14 @@ func equal(before, after ast.Decl) bool {
 			// var / const
 			if before.(*ast.GenDecl).Specs[0].(*ast.ValueSpec).Type.(*ast.Ident).Name != after.(*ast.GenDecl).Specs[0].(*ast.ValueSpec).Type.(*ast.Ident).Name {
 				// type changed
-				return false
+				return changeBreaking, "changed type"
 			}
 		case *ast.TypeSpec:
 			// type struct/interface/aliased
 
 			if reflect.TypeOf(before.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type) != reflect.TypeOf(after.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type) {
 				// Spec change, such as from StructType to InterfaceType or different aliased types
-				return false
+				return changeBreaking, "changed type of value spec"
 			}
 
 			switch before.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(type) {
@@ -93,23 +139,33 @@ func equal(before, after ast.Decl) bool {
 				beforeIface := before.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.InterfaceType)
 				afterIface := after.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.InterfaceType)
 
-				// interfaces don't care if methods are removed, so discard those
-				added, _, changed := diffFields(beforeIface.Methods.List, afterIface.Methods.List)
+				// interfaces don't care if methods are removed
+				added, removed, changed := diffFields(beforeIface.Methods.List, afterIface.Methods.List)
 
-				if len(added) > 0 || len(changed) > 0 {
-					// Fields were removed or changed types
-					return false
+				if len(added) > 0 {
+					// Fields were added
+					return changeBreaking, "members added"
+				} else if len(changed) > 0 {
+					// Fields changed types
+					return changeBreaking, "members changed types"
+				} else if len(removed) > 0 {
+					return changeNonBreaking, "members removed"
 				}
 			case *ast.StructType:
 				beforeStruct := before.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.StructType)
 				afterStruct := after.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.StructType)
 
-				// structs don't care if fields were added, so discard those
-				_, removed, changed := diffFields(beforeStruct.Fields.List, afterStruct.Fields.List)
+				// structs don't care if fields were added
+				added, removed, changed := diffFields(beforeStruct.Fields.List, afterStruct.Fields.List)
 
-				if len(removed) > 0 || len(changed) > 0 {
-					// Fields were removed or changed types
-					return false
+				if len(removed) > 0 {
+					// Fields were removed
+					return changeBreaking, "members removed"
+				} else if len(changed) > 0 {
+					// Fields changed types
+					return changeBreaking, "members changed types"
+				} else if len(added) > 0 {
+					return changeNonBreaking, "members added"
 				}
 			case *ast.Ident:
 				// alias
@@ -118,24 +174,24 @@ func equal(before, after ast.Decl) bool {
 		}
 	case *ast.FuncDecl:
 		if !equalFieldTypes(before.(*ast.FuncDecl).Type.Params.List, after.(*ast.FuncDecl).Type.Params.List) {
-			return false
+			return changeBreaking, "parameters types changed"
 		}
 
 		if before.(*ast.FuncDecl).Type.Results != nil {
 			if after.(*ast.FuncDecl).Type.Results == nil {
 				// removed return parameter
-				return false
+				return changeBreaking, "removed return parameter"
 			}
 
 			// Only check if we're changing/removing return parameters
 			if !equalFieldTypes(before.(*ast.FuncDecl).Type.Results.List, after.(*ast.FuncDecl).Type.Results.List) {
-				return false
+				return changeBreaking, "changed or removed return parameter"
 			}
 		}
 	default:
 		panic(fmt.Errorf("Unknown type: %T", before))
 	}
-	return true
+	return changeNone, ""
 }
 
 // equalFieldTypes compares two ast.FieldLists to ensure all types match

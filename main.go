@@ -41,17 +41,20 @@ func main() {
 			changes := diff(decls, newDecls[pkgName])
 
 			for _, change := range changes {
-				if change.before == nil {
-					fmt.Print("added:\n")
-					pcfg.Fprint(os.Stdout, fset, change.after)
-				} else if change.after == nil {
-					fmt.Print("removed:\n")
-					pcfg.Fprint(os.Stdout, fset, change.before)
+
+				if change.op == opChange {
+					fmt.Printf("%s (%s - %s)\n", change.op, change.changeType, change.summary)
 				} else {
-					fmt.Print("changed:\n")
+					fmt.Println(change.op)
+				}
+
+				if change.before != nil {
 					pcfg.Fprint(os.Stdout, fset, change.before)
-					fmt.Print("\n")
+					fmt.Println()
+				}
+				if change.after != nil {
 					pcfg.Fprint(os.Stdout, fset, change.after)
+					fmt.Println()
 				}
 				fmt.Println()
 			}
