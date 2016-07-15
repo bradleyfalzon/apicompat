@@ -40,7 +40,7 @@ func TestParse(t *testing.T) {
 		}
 	}
 
-	if len(os.Args) > 1 && os.Args[1] == "save" {
+	if len(os.Args) > 1 && os.Args[1] == "update" {
 		err := ioutil.WriteFile("testdata/exp.txt", got.Bytes(), os.FileMode(0644))
 		if err != nil {
 			t.Fatal("could not write exp data:", err)
