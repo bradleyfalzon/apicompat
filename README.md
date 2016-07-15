@@ -1,4 +1,6 @@
-_In development or abandoned_ (check last commit time to determine which)
+*In development or abandoned* (check last commit time to determine which)
+
+[![Build Status](https://travis-ci.org/bradleyfalzon/abicheck.svg?branch=master)](https://travis-ci.org/bradleyfalzon/abicheck)
 
 # Testing
 
