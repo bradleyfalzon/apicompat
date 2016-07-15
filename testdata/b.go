@@ -79,6 +79,12 @@ func FuncRemRet() {}
 // FuncChangeArg detects changes of function return params
 func FuncChangeRet() bool { return false }
 
+// FuncRecv tests changes to receivers
+type FuncRecv struct{}
+
+func (_ *FuncRecv) Method1(arg1 bool) (ret1 int) { return 1 }
+func (_ FuncRecv) Method2(arg1 bool) (ret1 int)  { return 1 }
+
 //var VarExp int = 1
 //var varPriv int = 1
 

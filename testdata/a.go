@@ -79,6 +79,12 @@ func FuncRemRet() error { return nil }
 // FuncChangeArg detects changes of function return params
 func FuncChangeRet() error { return nil }
 
+// FuncRecv tests changes to receivers
+type FuncRecv struct{}
+
+func (_ *FuncRecv) Method1(arg1 int) (ret1 error) { return nil }
+func (_ FuncRecv) Method2(arg1 int) (ret1 error)  { return nil }
+
 //var VarExp int = 1
 //var varPriv int = 1
 

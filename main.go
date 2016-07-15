@@ -122,8 +122,8 @@ func getDecls(astDecls []ast.Decl) decls {
 			if d.Recv != nil {
 				expr := d.Recv.List[0].Type
 				switch e := expr.(type) {
-				case *ast.UnaryExpr:
-					recv = e.X.(*ast.Ident).Name
+				case *ast.Ident:
+					recv = e.Name
 				case *ast.StarExpr:
 					recv = e.X.(*ast.Ident).Name
 				}
