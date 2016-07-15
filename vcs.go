@@ -51,3 +51,33 @@ func (v git) ReadFile(revision, path string) ([]byte, error) {
 	}
 	return contents, err
 }
+
+var _ vcs = (*strvcs)(nil)
+
+// strvcs provides a in memory vcs used for testing
+type strvcs struct {
+	files map[string]map[string][]byte // revision -> path -> contents
+}
+
+// SetFile contents for a particular revision and path
+func (v *strvcs) SetFile(revision, path string, contents []byte) {
+	if v.files == nil {
+		v.files = make(map[string]map[string][]byte)
+	}
+	if _, ok := v.files[revision]; !ok {
+		v.files[revision] = make(map[string][]byte)
+	}
+	v.files[revision][path] = contents
+}
+
+func (v strvcs) ReadDir(revision, path string) ([]string, error) {
+	var files []string
+	for file := range v.files[revision] {
+		files = append(files, file)
+	}
+	return files, nil
+}
+
+func (v strvcs) ReadFile(revision, path string) ([]byte, error) {
+	return v.files[revision][path], nil
+}

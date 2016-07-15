@@ -1,0 +1,81 @@
+added
+	const ConstAdded int = 0
+changed (breaking change - changed type)
+	const ConstChangeType int = 0
+	const ConstChangeType uint = 0
+removed
+	const ConstRemoved int = 0
+changed (breaking change - parameters types changed)
+	func FuncAddArg() {
+	}
+	func FuncAddArg(arg1 int) {
+	}
+changed (breaking change - parameters types changed)
+	func FuncChangeArg(arg1 int) {
+	}
+	func FuncChangeArg(param uint) {
+	}
+changed (breaking change - changed or removed return parameter)
+	func FuncChangeRet() error {
+		return nil
+	}
+	func FuncChangeRet() bool {
+		return false
+	}
+changed (breaking change - parameters types changed)
+	func FuncRemArg(arg1 int) {
+	}
+	func FuncRemArg() {
+	}
+changed (breaking change - removed return parameter)
+	func FuncRemRet() error {
+		return nil
+	}
+	func FuncRemRet() {
+	}
+changed (breaking change - changed spec)
+	const GenDeclSpecChange int = 1
+	type GenDeclSpecChange struct{}
+changed (breaking change - changed declaration)
+	const GenFuncDeclChange int = 1
+	func GenFuncDeclChange() {
+	}
+changed (breaking change - members added)
+	type IfaceAddMember interface{}
+	type IfaceAddMember interface {
+		Member1(arg1 int) (ret1 bool)
+	}
+changed (breaking change - members changed types)
+	type IfaceChangeMemberArg interface {
+		Member1(arg1 int) (ret1 bool)
+	}
+	type IfaceChangeMemberArg interface {
+		Member1(arg1 uint) (ret1 bool)
+	}
+changed (breaking change - members changed types)
+	type IfaceChangeMemberReturn interface {
+		Member1(arg1 int) (ret1 bool)
+	}
+	type IfaceChangeMemberReturn interface {
+		Member1(arg1 int) (ret1 int)
+	}
+changed (non-breaking change - members removed)
+	type IfaceRemMember interface {
+		Member1(arg1 int) (ret1 bool)
+	}
+	type IfaceRemMember interface{}
+changed (non-breaking change - members added)
+	type StructAddMember struct{}
+	type StructAddMember struct{ Member1 int }
+changed (breaking change - members changed types)
+	type StructChangeMember struct{ Member1 int }
+	type StructChangeMember struct{ Member1 uint }
+changed (breaking change - members removed)
+	type StructRemMember struct{ Member1 int }
+	type StructRemMember struct{}
+changed (breaking change - changed type of value spec)
+	type TypeSpecChange struct{}
+	type TypeSpecChange interface{}
+changed (breaking change - changed type)
+	const ValChangeType int = 0
+	const ValChangeType uint = 0

@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"log"
+	"sort"
 )
 
 func main() {
@@ -34,6 +35,7 @@ func main() {
 		log.Printf("Processing pkg %s with %d declarations", pkgName, len(decls))
 		if _, ok := newDecls[pkgName]; ok {
 			changes := diff(decls, newDecls[pkgName])
+			sort.Sort(byID(changes))
 			for _, change := range changes {
 				fmt.Println(change)
 			}

@@ -49,9 +49,10 @@ func (op operation) String() string {
 
 // change is the ast declaration containing the before and after
 type change struct {
+	id         string
+	summary    string
 	op         operation
 	changeType changeType
-	summary    string
 	before     ast.Decl
 	after      ast.Decl
 }
@@ -78,6 +79,13 @@ func (c change) String() string {
 	return buf.String()
 }
 
+// byID implements sort.Interface for []change based on the id field
+type byID []change
+
+func (a byID) Len() int           { return len(a) }
+func (a byID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byID) Less(i, j int) bool { return a[i].id < a[j].id }
+
 // decls is a map of an identifier to actual ast, where the id is a unique
 // name to match declarations for before and after
 type decls map[string]ast.Decl
@@ -97,7 +105,7 @@ func diff(bdecls map[string]ast.Decl, adecls map[string]ast.Decl) (changes []cha
 	for id, decl := range bdecls {
 		if _, ok := adecls[id]; !ok {
 			// in before, not in after, therefore it was removed
-			changes = append(changes, change{op: opRemove, before: decl})
+			changes = append(changes, change{id: id, op: opRemove, before: decl})
 			continue
 		}
 
@@ -108,6 +116,7 @@ func diff(bdecls map[string]ast.Decl, adecls map[string]ast.Decl) (changes []cha
 		}
 
 		changes = append(changes, change{
+			id:         id,
 			op:         opChange,
 			changeType: changeType,
 			summary:    summary,
@@ -119,7 +128,7 @@ func diff(bdecls map[string]ast.Decl, adecls map[string]ast.Decl) (changes []cha
 	for id, decl := range adecls {
 		if _, ok := bdecls[id]; !ok {
 			// in after, not in before, therefore it was added
-			changes = append(changes, change{op: opAdd, after: decl})
+			changes = append(changes, change{id: id, op: opAdd, after: decl})
 		}
 	}
 
