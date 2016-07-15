@@ -6,36 +6,34 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"log"
 	"os"
 )
 
 func main() {
-	log.Println("Starting...")
-
-	// arguments
-	oldRevID := "HEAD~1"
-	newRevID := "HEAD"
-
-	log.Printf("old rev: %v, new rev: %v", oldRevID, newRevID)
+	const (
+		oldRevID = "HEAD~1"
+		newRevID = "HEAD"
+	)
 
 	// new vcs
-	vcs := git{}
+	var vcs git
 
 	oldDecls, err := parse(vcs, oldRevID)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Error parsing %s: %s", oldRevID, err.Error())
+		os.Exit(1)
 	}
 
 	newDecls, err := parse(vcs, newRevID)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Error parsing %s: %s", newRevID, err.Error())
+		os.Exit(1)
 	}
 
 	fset := token.NewFileSet() // only require non-nil fset
 	pcfg := printer.Config{Mode: printer.RawFormat, Indent: 1}
 	for pkgName, decls := range oldDecls {
-		log.Printf("Processing pkg %s with %d declarations", pkgName, len(decls))
+		fmt.Printf("Processing pkg %s with %d declarations\n", pkgName, len(decls))
 
 		if _, ok := newDecls[pkgName]; ok {
 			changes := diff(decls, newDecls[pkgName])
@@ -85,7 +83,7 @@ func parse(vcs vcs, revision string) (map[string]decls, error) {
 	return decls, nil
 }
 
-// TODO move this to a method, which already has vcs and other options set
+// TODO(bradleyfalzon): move this to a method, which already has vcs and other options set
 func parseFiles(vcs vcs, rev string, files []string) (map[string]*ast.Package, error) {
 	fset := token.NewFileSet()
 	pkgs := make(map[string]*ast.Package)
@@ -123,26 +121,26 @@ func getDecls(astDecls []ast.Decl) decls {
 			id   string // unique
 			recv string
 		)
-		switch astDecl.(type) {
+		switch d := astDecl.(type) {
 		case *ast.GenDecl:
-			switch astDecl.(*ast.GenDecl).Specs[0].(type) {
+			switch s := d.Specs[0].(type) {
 			case *ast.ValueSpec:
 				// var / const
-				id = astDecl.(*ast.GenDecl).Specs[0].(*ast.ValueSpec).Names[0].Name
+				id = s.Names[0].Name
 			case *ast.TypeSpec:
 				// type struct/interface/etc
-				id = astDecl.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Name.Name
+				id = s.Name.Name
 			}
 		case *ast.FuncDecl:
 			// function or method
-			id = astDecl.(*ast.FuncDecl).Name.Name
-			if astDecl.(*ast.FuncDecl).Recv != nil {
-				expr := astDecl.(*ast.FuncDecl).Recv.List[0].Type
-				switch expr.(type) {
+			id = d.Name.Name
+			if d.Recv != nil {
+				expr := d.Recv.List[0].Type
+				switch e := expr.(type) {
 				case *ast.UnaryExpr:
-					recv = expr.(*ast.UnaryExpr).X.(*ast.Ident).Name
+					recv = e.X.(*ast.Ident).Name
 				case *ast.StarExpr:
-					recv = expr.(*ast.StarExpr).X.(*ast.Ident).Name
+					recv = e.X.(*ast.Ident).Name
 				}
 				id = recv + "." + id
 			}

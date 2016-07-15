@@ -1,11 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
-	"log"
 	"reflect"
-	"strings"
 )
 
 // change is the ast declaration containing the before and after
@@ -19,17 +18,18 @@ type change struct {
 type decls map[string]ast.Decl
 
 func (d decls) String() string {
-	var out string
+	var b bytes.Buffer
 	for id := range d {
 		// todo have a string method on each decl
-		out += fmt.Sprintf("declaration id: %v\n", id)
+		fmt.Fprintf(&b, "declaration id: %v\n", id)
 	}
-	return out
+	return b.String()
 }
 
-func diff(bdecls map[string]ast.Decl, adecls map[string]ast.Decl) (changes []change) {
-	log.Println("determining differences...")
+func diff(bdecls, adecls decls) []change {
+	fmt.Println("determining differences...")
 
+	var changes []change
 	for id, decl := range bdecls {
 		if _, ok := adecls[id]; !ok {
 			// in before, not in after, therefore it was removed
@@ -66,46 +66,50 @@ func equal(before, after ast.Decl) bool {
 		return false
 	}
 
-	switch before.(type) {
+	switch b := before.(type) {
 	case *ast.GenDecl:
-		if reflect.TypeOf(before.(*ast.GenDecl).Specs[0]) != reflect.TypeOf(after.(*ast.GenDecl).Specs[0]) {
+		a := after.(*ast.GenDecl)
+
+		if reflect.TypeOf(b.Specs[0]) != reflect.TypeOf(a.Specs[0]) {
 			// Spec changed, such as ValueSpec to TypeSpec (eg var/const to struct)
 			return false
 		}
 
-		switch before.(*ast.GenDecl).Specs[0].(type) {
+		switch bspec := b.Specs[0].(type) {
 		case *ast.ValueSpec:
+			aspec := a.Specs[0].(*ast.ValueSpec)
+
 			// var / const
-			if before.(*ast.GenDecl).Specs[0].(*ast.ValueSpec).Type.(*ast.Ident).Name != after.(*ast.GenDecl).Specs[0].(*ast.ValueSpec).Type.(*ast.Ident).Name {
+			if bspec.Type.(*ast.Ident).Name != aspec.Type.(*ast.Ident).Name {
 				// type changed
 				return false
 			}
 		case *ast.TypeSpec:
+			aspec := a.Specs[0].(*ast.TypeSpec)
+
 			// type struct/interface/aliased
 
-			if reflect.TypeOf(before.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type) != reflect.TypeOf(after.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type) {
+			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
 				// Spec change, such as from StructType to InterfaceType or different aliased types
 				return false
 			}
 
-			switch before.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(type) {
+			switch btype := bspec.Type.(type) {
 			case *ast.InterfaceType:
-				beforeIface := before.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.InterfaceType)
-				afterIface := after.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.InterfaceType)
+				atype := aspec.Type.(*ast.InterfaceType)
 
 				// interfaces don't care if methods are removed, so discard those
-				added, _, changed := diffFields(beforeIface.Methods.List, afterIface.Methods.List)
+				added, _, changed := diffFields(btype.Methods.List, atype.Methods.List)
 
 				if len(added) > 0 || len(changed) > 0 {
 					// Fields were removed or changed types
 					return false
 				}
 			case *ast.StructType:
-				beforeStruct := before.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.StructType)
-				afterStruct := after.(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.StructType)
+				atype := aspec.Type.(*ast.StructType)
 
 				// structs don't care if fields were added, so discard those
-				_, removed, changed := diffFields(beforeStruct.Fields.List, afterStruct.Fields.List)
+				_, removed, changed := diffFields(btype.Fields.List, atype.Fields.List)
 
 				if len(removed) > 0 || len(changed) > 0 {
 					// Fields were removed or changed types
@@ -117,18 +121,20 @@ func equal(before, after ast.Decl) bool {
 			}
 		}
 	case *ast.FuncDecl:
-		if !equalFieldTypes(before.(*ast.FuncDecl).Type.Params.List, after.(*ast.FuncDecl).Type.Params.List) {
+		a := after.(*ast.FuncDecl)
+
+		if !equalFieldTypes(b.Type.Params.List, a.Type.Params.List) {
 			return false
 		}
 
-		if before.(*ast.FuncDecl).Type.Results != nil {
-			if after.(*ast.FuncDecl).Type.Results == nil {
+		if b.Type.Results != nil {
+			if a.Type.Results == nil {
 				// removed return parameter
 				return false
 			}
 
 			// Only check if we're changing/removing return parameters
-			if !equalFieldTypes(before.(*ast.FuncDecl).Type.Results.List, after.(*ast.FuncDecl).Type.Results.List) {
+			if !equalFieldTypes(b.Type.Results.List, a.Type.Results.List) {
 				return false
 			}
 		}
@@ -190,26 +196,30 @@ func diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Fiel
 // typeToString returns a string representation of a fields type (if it's an
 // ident) or if it's a funcType, the params and return types
 func typeToString(ident ast.Expr) string {
-	switch ident.(type) {
+	switch v := ident.(type) {
 	case *ast.Ident:
 		// perhaps a struct
-		return ident.(*ast.Ident).Name
+		return v.Name
 	case *ast.FuncType:
 		// perhaps interface/func
-		// TODO change to buffer
-		var (
-			params  []string
-			results []string
-		)
-		for _, list := range ident.(*ast.FuncType).Params.List {
-			params = append(params, list.Type.(*ast.Ident).Name)
+		var params, results bytes.Buffer
+
+		for i, list := range v.Params.List {
+			if i != 0 {
+				fmt.Fprint(&params, ", ")
+			}
+			fmt.Fprint(&params, list.Type.(*ast.Ident).Name)
 		}
-		if ident.(*ast.FuncType).Results != nil {
-			for _, list := range ident.(*ast.FuncType).Results.List {
-				results = append(results, list.Type.(*ast.Ident).Name)
+		if v.Results != nil {
+			for i, list := range v.Results.List {
+				if i != 0 {
+					fmt.Fprint(&results, ", ")
+				}
+				fmt.Fprint(&results, list.Type.(*ast.Ident).Name)
 			}
 		}
-		return fmt.Sprintf("(%s) (%s)", strings.Join(params, ","), strings.Join(results, ","))
+		return fmt.Sprintf("(%s) (%s)", params.String(), results.String())
+	default:
+		panic(fmt.Errorf("Unknown decl type: %T", ident))
 	}
-	panic(fmt.Errorf("Unknown decl type: %T", ident))
 }
