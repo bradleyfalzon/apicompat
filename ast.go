@@ -88,15 +88,6 @@ func (a byID) Less(i, j int) bool { return a[i].id < a[j].id }
 // name to match declarations for before and after
 type decls map[string]ast.Decl
 
-func (d decls) String() string {
-	var b bytes.Buffer
-	for id := range d {
-		// todo have a string method on each decl
-		fmt.Fprintf(&b, "declaration id: %v\n", id)
-	}
-	return b.String()
-}
-
 func diff(bdecls, adecls decls) []change {
 	fmt.Println("determining differences...")
 
