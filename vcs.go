@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -22,10 +23,10 @@ var _ vcs = (*git)(nil)
 // git implements vcs and uses exec.Command to access repository
 type git struct{}
 
-func (v git) ReadDir(revision, path string) ([]string, error) {
+func (git) ReadDir(revision, path string) ([]string, error) {
 	// Add trailing slash if path is set and doesn't already contain one
-	if len(path) > 0 && !strings.HasSuffix(path, "/") {
-		path += "/"
+	if path != "" && !strings.HasSuffix(path, string(os.PathSeparator)) {
+		path += string(os.PathSeparator)
 	}
 
 	ls, err := exec.Command("git", "ls-tree", "-r", "--name-only", revision, path).Output()
@@ -43,7 +44,7 @@ func (v git) ReadDir(revision, path string) ([]string, error) {
 	return files, nil
 }
 
-func (v git) ReadFile(revision, path string) ([]byte, error) {
+func (git) ReadFile(revision, path string) ([]byte, error) {
 	args := []string{"show", revision + ":" + path}
 	contents, err := exec.Command("git", args...).Output()
 	if err != nil {
