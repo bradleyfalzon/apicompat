@@ -1,0 +1,5 @@
+language: go
+script:
+    - go test -v ./...
+    - which bash
+    - cd testgit; bash make.sh && abicheck
