@@ -71,21 +71,21 @@ changed (breaking change - changed declaration)
 changed (breaking change - members added)
 	type IfaceAddMember interface{}
 	type IfaceAddMember interface {
-		Member1(arg1 int) (ret1 bool)
+		Member1(int) (bool)
 	}
 changed (breaking change - members changed types)
 	type IfaceChangeMemberArg interface {
-		Member1(arg1 int) (ret1 bool)
+		Member1(int) (bool)
 	}
 	type IfaceChangeMemberArg interface {
-		Member1(arg1 uint) (ret1 bool)
+		Member1(uint) (bool)
 	}
 changed (breaking change - members changed types)
 	type IfaceChangeMemberReturn interface {
-		Member1(arg1 int) (ret1 bool)
+		Member1(int) (bool)
 	}
 	type IfaceChangeMemberReturn interface {
-		Member1(arg1 int) (ret1 int)
+		Member1(int) (int)
 	}
 changed (non-breaking change - members removed)
 	type IfaceRemMember interface {
@@ -94,7 +94,10 @@ changed (non-breaking change - members removed)
 	type IfaceRemMember interface{}
 changed (non-breaking change - members added)
 	type StructAddMember struct{}
-	type StructAddMember struct{ Member1 int }
+	type StructAddMember struct {
+		Member1	int
+		Member2	[]int
+	}
 changed (breaking change - members changed types)
 	type StructChangeMember struct{ Member1 int }
 	type StructChangeMember struct{ Member1 uint }
@@ -105,5 +108,5 @@ changed (breaking change - changed type of value spec)
 	type TypeSpecChange struct{}
 	type TypeSpecChange interface{}
 changed (breaking change - changed type)
-	const ValChangeType int = 0
-	const ValChangeType uint = 0
+	var VarChangeType int
+	var VarChangeType uint

@@ -56,23 +56,23 @@ type change struct {
 }
 
 func (c change) String() string {
-	fset := &token.FileSet{} // only require non-nil fset
+	fset := token.FileSet{} // only require non-nil fset
 	pcfg := printer.Config{Mode: printer.RawFormat, Indent: 1}
+	buf := bytes.Buffer{}
 
-	buf := bytes.NewBufferString("")
 	if c.op == opChange {
-		fmt.Fprintf(buf, "%s (%s - %s)\n", c.op, c.changeType, c.summary)
+		fmt.Fprintf(&buf, "%s (%s - %s)\n", c.op, c.changeType, c.summary)
 	} else {
-		fmt.Fprintln(buf, c.op)
+		fmt.Fprintln(&buf, c.op)
 	}
 
 	if c.before != nil {
-		pcfg.Fprint(buf, fset, c.before)
-		fmt.Fprintln(buf)
+		pcfg.Fprint(&buf, &fset, c.before)
+		fmt.Fprintln(&buf)
 	}
 	if c.after != nil {
-		pcfg.Fprint(buf, fset, c.after)
-		fmt.Fprintln(buf)
+		pcfg.Fprint(&buf, &fset, c.after)
+		fmt.Fprintln(&buf)
 	}
 	return buf.String()
 }
@@ -148,6 +148,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 		switch bspec := b.Specs[0].(type) {
 		case *ast.ValueSpec:
 			aspec := a.Specs[0].(*ast.ValueSpec)
+			// refactoring opportunity here with equalFieldTypes
 
 			// var / const
 			if bspec.Type.(*ast.Ident).Name != aspec.Type.(*ast.Ident).Name {
@@ -299,33 +300,27 @@ func diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Fiel
 	return added, removed, changed
 }
 
-// typeToString returns a string representation of a fields type (if it's an
-// ident) or if it's a funcType, the params and return types
+// typeToString returns a type, such as ident or function and returns a string
+// representation (without superfluous variable names when necessary).
+//
+// This is designed to make comparisons simpler by not having to handle all
+// the various ast permutations, but this is the slowest method and may have
+// its own set of undesirable properties (including a performance penalty).
 func typeToString(ident ast.Expr) string {
-	switch v := ident.(type) {
-	case *ast.Ident:
-		// perhaps a struct
-		return v.Name
-	case *ast.FuncType:
-		// perhaps interface/func
-		var params, results bytes.Buffer
+	fset := token.FileSet{} // only require non-nil fset
+	pcfg := printer.Config{Mode: printer.RawFormat}
+	buf := bytes.Buffer{}
 
-		for i, list := range v.Params.List {
-			if i != 0 {
-				fmt.Fprint(&params, ", ")
-			}
-			fmt.Fprint(&params, list.Type.(*ast.Ident).Name)
+	switch v := ident.(type) {
+	case *ast.FuncType:
+		for i := range v.Params.List {
+			v.Params.List[i].Names = []*ast.Ident{}
 		}
-		if v.Results != nil {
-			for i, list := range v.Results.List {
-				if i != 0 {
-					fmt.Fprint(&results, ", ")
-				}
-				fmt.Fprint(&results, list.Type.(*ast.Ident).Name)
-			}
+		for i := range v.Results.List {
+			v.Results.List[i].Names = []*ast.Ident{}
 		}
-		return fmt.Sprintf("(%s) (%s)", params.String(), results.String())
-	default:
-		panic(fmt.Errorf("Unknown decl type: %T %#v", ident, ident))
 	}
+	pcfg.Fprint(&buf, &fset, ident)
+
+	return buf.String()
 }

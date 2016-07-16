@@ -18,7 +18,7 @@ const GenDeclSpecChange int = 1
 const ConstChangeType int = 0
 
 // ValChangeType detects a change of type for a constant
-const ValChangeType int = 0
+var VarChangeType int
 
 // TypeSpecChange detects a change between types specs
 type TypeSpecChange struct{}

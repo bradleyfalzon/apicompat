@@ -18,7 +18,7 @@ type GenDeclSpecChange struct{}
 const ConstChangeType uint = 0
 
 // ValChangeType detects a change of type for a constant
-const ValChangeType uint = 0
+var VarChangeType uint
 
 // TypeSpecChange detects a change between types specs
 type TypeSpecChange interface{}
@@ -26,6 +26,7 @@ type TypeSpecChange interface{}
 // StructAddMember detects additions of struct fields (is not a problem)
 type StructAddMember struct {
 	Member1 int
+	Member2 []int
 }
 
 // StructRemMember detects removals of struct fields
