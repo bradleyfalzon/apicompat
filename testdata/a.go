@@ -1,5 +1,7 @@
 package library
 
+import "bytes"
+
 // ConstAdded detects something being added
 //const ConstAdded int = 0 // will be added
 
@@ -77,7 +79,9 @@ func FuncAddRet() {}
 func FuncRemRet() error { return nil }
 
 // FuncChangeArg detects changes of function return params
-func FuncChangeRet() error { return nil }
+func FuncChangeRet() error                     { return nil }
+func FuncChangeRetStarIdent() *int             { return nil }
+func FuncChangeRetStarSelector() *bytes.Buffer { return nil }
 
 // FuncRecv tests changes to receivers
 type FuncRecv struct{}

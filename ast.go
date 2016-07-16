@@ -222,17 +222,46 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 }
 
 // equalFieldTypes compares two ast.FieldLists to ensure all types match
-func equalFieldTypes(a, b []*ast.Field) bool {
-	if len(a) != len(b) {
+func equalFieldTypes(before, after []*ast.Field) bool {
+	if len(before) != len(after) {
 		// different amount of parameters
 		return false
 	}
 
-	for i, li := range a {
-		if li.Type != b[i].Type {
+	for i := range before {
+		// TODO I think there's some duplication here, surely comparing types
+		// and handling changes between type and then comparing ident and starexpr
+		// is already done elsewhere
+		if reflect.TypeOf(before[i].Type) != reflect.TypeOf(after[i].Type) {
 			// type changed
 			return false
 		}
+
+		switch btype := before[i].Type.(type) {
+		case *ast.Ident:
+			// eg func a() int
+			atype := after[i].Type.(*ast.Ident)
+			return btype.Name == atype.Name
+		case *ast.StarExpr:
+			// *ident or *select.ident
+			atype := after[i].Type.(*ast.StarExpr)
+			if reflect.TypeOf(btype.X) != reflect.TypeOf(atype.X) {
+				// type changed between *ident and *selector.ident
+				return false
+			}
+
+			switch bstartype := btype.X.(type) {
+			case *ast.Ident:
+				// *ident
+				astartype := atype.X.(*ast.Ident)
+				return bstartype.Name == astartype.Name
+			case *ast.SelectorExpr:
+				// *selector.ident
+				return btype.X.(*ast.SelectorExpr).Sel.Name == atype.X.(*ast.SelectorExpr).Sel.Name
+			}
+			panic(fmt.Sprintf("unexpected type %T", btype.X))
+		}
+		panic(fmt.Sprintf("unexpected type %T", before[i].Type))
 	}
 	return true
 }
@@ -297,6 +326,6 @@ func typeToString(ident ast.Expr) string {
 		}
 		return fmt.Sprintf("(%s) (%s)", params.String(), results.String())
 	default:
-		panic(fmt.Errorf("Unknown decl type: %T", ident))
+		panic(fmt.Errorf("Unknown decl type: %T %#v", ident, ident))
 	}
 }

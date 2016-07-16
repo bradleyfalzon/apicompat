@@ -130,7 +130,7 @@ func getDecls(astDecls []ast.Decl) decls {
 				id = recv + "." + id
 			}
 		default:
-			panic(fmt.Errorf("Unknown decl type: %T", astDecl))
+			panic(fmt.Errorf("Unknown decl type: %#v", astDecl))
 		}
 		// If it's exported and it's either not a receiver OR the receiver is also exported
 		if ast.IsExported(id) && recv == "" || ast.IsExported(recv) {
