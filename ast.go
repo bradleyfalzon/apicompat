@@ -206,7 +206,11 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				}
 			case *ast.Ident:
 				// alias
-				panic("not yet implemented")
+				atype := aspec.Type.(*ast.Ident)
+				if btype.Name != atype.Name {
+					// Alias typing changed underlying types
+					return changeBreaking, "alias changed its underlying type"
+				}
 			}
 		}
 	case *ast.FuncDecl:

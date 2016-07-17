@@ -64,6 +64,9 @@ type IfaceChangeMemberReturn interface {
 	Member1(arg1 int) (ret1 int)
 }
 
+// TypeAlias detects changes to alias types
+type TypeAlias uint
+
 // FuncAddArg detects additions of function parameter types
 func FuncAddArg(arg1 int) {}
 
