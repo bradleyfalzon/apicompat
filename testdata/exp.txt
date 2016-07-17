@@ -71,7 +71,7 @@ changed (breaking change - changed declaration)
 changed (breaking change - members added)
 	type IfaceAddMember interface{}
 	type IfaceAddMember interface {
-		Member1(int) (bool)
+		Member1(arg1 int) (ret1 bool)
 	}
 changed (breaking change - members changed types)
 	type IfaceChangeMemberArg interface {

@@ -262,32 +262,29 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 
 func diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Field) {
 	// Presort after for quicker matching of fieldname -> type, may not be worthwhile
-	AfterMembers := make(map[string]string)
+	AfterMembers := make(map[string]*ast.Field)
 	for i, field := range after {
-		AfterMembers[fieldKey(field, i)] = typeToString(field.Type)
+		AfterMembers[fieldKey(field, i)] = field
 	}
 
-	for i, field := range before {
-		if afterType, ok := AfterMembers[fieldKey(field, i)]; ok {
-			if afterType != typeToString(field.Type) {
+	for i, bfield := range before {
+		bkey := fieldKey(bfield, i)
+		if afield, ok := AfterMembers[bkey]; ok {
+			if !exprEqual(bfield.Type, afield.Type) {
 				// changed
-				changed = append(changed, field)
+				changed = append(changed, bfield)
 			}
-			delete(AfterMembers, fieldKey(field, i))
+			delete(AfterMembers, bkey)
 			continue
 		}
 
 		// Removed
-		removed = append(removed, field)
+		removed = append(removed, bfield)
 	}
 
-	// What's left in afterFields has added
-	for member := range AfterMembers {
-		for i, field := range after {
-			if fieldKey(field, i) == member {
-				added = append(added, field)
-			}
-		}
+	// What's left in afterMembers has added
+	for _, afield := range AfterMembers {
+		added = append(added, afield)
 	}
 
 	return added, removed, changed
