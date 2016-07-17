@@ -185,6 +185,16 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				if !exprEqual(btype.Elt, atype.Elt) {
 					return changeBreaking, "changed of array's element's type"
 				}
+			case *ast.MapType:
+				// map
+				atype := aspec.Type.(*ast.MapType)
+
+				if !exprEqual(btype.Key, atype.Key) {
+					return changeBreaking, "changed map's key's type"
+				}
+				if !exprEqual(btype.Value, atype.Value) {
+					return changeBreaking, "changed map's value's type"
+				}
 			default:
 				panic(fmt.Errorf("Unknown val spec type: %T", btype))
 			}

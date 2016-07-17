@@ -121,6 +121,12 @@ changed (breaking change - changed of array's length)
 changed (breaking change - changed of array's element's type)
 	var VarChangeTypeArrayType [1]int
 	var VarChangeTypeArrayType [1]uint
+changed (breaking change - changed map's key's type)
+	var VarChangeTypeMapKey map[int]int
+	var VarChangeTypeMapKey map[uint]int
+changed (breaking change - changed map's value's type)
+	var VarChangeTypeMapValue map[int]int
+	var VarChangeTypeMapValue map[int]uint
 changed (breaking change - changed of array's element's type)
 	var VarChangeTypeSlice []int
 	var VarChangeTypeSlice []uint

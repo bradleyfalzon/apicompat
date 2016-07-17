@@ -42,6 +42,12 @@ var VarChangeTypeArrayLen [1]int
 // VarChangeTypeArrayType detects a change in an array's type
 var VarChangeTypeArrayType [1]int
 
+// VarChangeTypeMapKey detects a achange in a map's key
+var VarChangeTypeMapKey map[int]int
+
+// VarChangeTypeMapValue detects a achange in a map's value
+var VarChangeTypeMapValue map[int]int
+
 // TypeSpecChange detects a change between types specs
 type TypeSpecChange struct{}
 
