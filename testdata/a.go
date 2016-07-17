@@ -20,6 +20,21 @@ const ConstChangeType int = 0
 // ValChangeType detects a change of type for a constant
 var VarChangeType int
 
+// VarChangeValSpecType detects a change between val spec types
+var VarChangeValSpecType int
+
+// VarChangeTypeSlice detects a change in a slice's type
+var VarChangeTypeSlice []int
+
+// VarChangeTypeArrayLen detects a change between slice and array
+var VarChangeTypeSliceLen []int
+
+// VarChangeTypeArrayLen detects a change in an array's length
+var VarChangeTypeArrayLen [1]int
+
+// VarChangeTypeArrayType detects a change in an array's type
+var VarChangeTypeArrayType [1]int
+
 // TypeSpecChange detects a change between types specs
 type TypeSpecChange struct{}
 

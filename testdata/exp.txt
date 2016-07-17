@@ -104,9 +104,27 @@ changed (breaking change - members changed types)
 changed (breaking change - members removed)
 	type StructRemMember struct{ Member1 int }
 	type StructRemMember struct{}
+changed (breaking change - alias changed its underlying type)
+	type TypeAlias int
+	type TypeAlias uint
 changed (breaking change - changed type of value spec)
 	type TypeSpecChange struct{}
 	type TypeSpecChange interface{}
 changed (breaking change - changed type)
 	var VarChangeType int
 	var VarChangeType uint
+changed (breaking change - changed of array's length)
+	var VarChangeTypeArrayLen [1]int
+	var VarChangeTypeArrayLen [2]int
+changed (breaking change - changed of array's element's type)
+	var VarChangeTypeArrayType [1]int
+	var VarChangeTypeArrayType [1]uint
+changed (breaking change - changed of array's element's type)
+	var VarChangeTypeSlice []int
+	var VarChangeTypeSlice []uint
+changed (breaking change - changed of array's length)
+	var VarChangeTypeSliceLen []int
+	var VarChangeTypeSliceLen [1]int
+changed (breaking change - changed value spec type)
+	var VarChangeValSpecType int
+	var VarChangeValSpecType []int

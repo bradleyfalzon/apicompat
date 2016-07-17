@@ -158,10 +158,34 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				return changeUnknown, "cannot currently determine type"
 			}
 
+			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
+				// eg change from int to []int
+				return changeBreaking, "changed value spec type"
+			}
+
 			// var / const
-			if bspec.Type.(*ast.Ident).Name != aspec.Type.(*ast.Ident).Name {
-				// type changed
-				return changeBreaking, "changed type"
+			switch btype := bspec.Type.(type) {
+			case *ast.Ident:
+				// int/string/etc
+				atype := aspec.Type.(*ast.Ident)
+				if btype.Name != atype.Name {
+					// type changed
+					return changeBreaking, "changed type"
+				}
+			case *ast.ArrayType:
+				// slice/array
+				atype := aspec.Type.(*ast.ArrayType)
+				// compare length
+				if !exprEqual(btype.Len, atype.Len) {
+					// change of length, or between array and slice
+					return changeBreaking, "changed of array's length"
+				}
+				// compare array's element's type
+				if !exprEqual(btype.Elt, atype.Elt) {
+					return changeBreaking, "changed of array's element's type"
+				}
+			default:
+				panic(fmt.Errorf("Unknown val spec type: %T", btype))
 			}
 		case *ast.TypeSpec:
 			aspec := a.Specs[0].(*ast.TypeSpec)
@@ -280,6 +304,12 @@ func fieldKey(field *ast.Field, i int) string {
 	return strconv.FormatInt(int64(i), 10)
 }
 
+// exprEqual compares two ast.Expr to determine if they are equal
+func exprEqual(before, after ast.Expr) bool {
+	// For the moment just use typeToString and compare strings
+	return typeToString(before) == typeToString(after)
+}
+
 // typeToString returns a type, such as ident or function and returns a string
 // representation (without superfluous variable names when necessary).
 //
@@ -295,6 +325,7 @@ func typeToString(ident ast.Expr) string {
 
 	switch v := ident.(type) {
 	case *ast.FuncType:
+		// strip variable names in functions
 		for i := range v.Params.List {
 			v.Params.List[i].Names = []*ast.Ident{}
 		}
