@@ -93,8 +93,6 @@ func (a byID) Less(i, j int) bool { return a[i].id < a[j].id }
 type decls map[string]ast.Decl
 
 func diff(bdecls, adecls decls) []change {
-	fmt.Println("determining differences...")
-
 	var changes []change
 	for id, decl := range bdecls {
 		if _, ok := adecls[id]; !ok {
@@ -105,7 +103,7 @@ func diff(bdecls, adecls decls) []change {
 
 		// in before and in after, check if there's a difference
 		changeType, summary := compareDecl(bdecls[id], adecls[id])
-		if changeType == changeNone {
+		if changeType == changeNone || changeType == changeUnknown {
 			continue
 		}
 
