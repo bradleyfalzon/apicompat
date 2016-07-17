@@ -7,6 +7,7 @@ import (
 	"go/printer"
 	"go/token"
 	"reflect"
+	"strconv"
 )
 
 type changeType uint8
@@ -201,7 +202,8 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 		}
 	case *ast.FuncDecl:
 		a := after.(*ast.FuncDecl)
-		if !equalFieldTypes(b.Type.Params.List, a.Type.Params.List) {
+		added, removed, changed := diffFields(b.Type.Params.List, a.Type.Params.List)
+		if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
 			return changeBreaking, "parameters types changed"
 		}
 
@@ -211,8 +213,9 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				return changeBreaking, "removed return parameter"
 			}
 
+			_, removed, changed := diffFields(b.Type.Results.List, a.Type.Results.List)
 			// Only check if we're changing/removing return parameters
-			if !equalFieldTypes(b.Type.Results.List, a.Type.Results.List) {
+			if len(removed) > 0 || len(changed) > 0 {
 				return changeBreaking, "changed or removed return parameter"
 			}
 		}
@@ -222,65 +225,20 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 	return changeNone, ""
 }
 
-// equalFieldTypes compares two ast.FieldLists to ensure all types match
-func equalFieldTypes(before, after []*ast.Field) bool {
-	if len(before) != len(after) {
-		// different amount of parameters
-		return false
-	}
-
-	for i := range before {
-		// TODO I think there's some duplication here, surely comparing types
-		// and handling changes between type and then comparing ident and starexpr
-		// is already done elsewhere
-		if reflect.TypeOf(before[i].Type) != reflect.TypeOf(after[i].Type) {
-			// type changed
-			return false
-		}
-
-		switch btype := before[i].Type.(type) {
-		case *ast.Ident:
-			// eg func a() int
-			atype := after[i].Type.(*ast.Ident)
-			return btype.Name == atype.Name
-		case *ast.StarExpr:
-			// *ident or *select.ident
-			atype := after[i].Type.(*ast.StarExpr)
-			if reflect.TypeOf(btype.X) != reflect.TypeOf(atype.X) {
-				// type changed between *ident and *selector.ident
-				return false
-			}
-
-			switch bstartype := btype.X.(type) {
-			case *ast.Ident:
-				// *ident
-				astartype := atype.X.(*ast.Ident)
-				return bstartype.Name == astartype.Name
-			case *ast.SelectorExpr:
-				// *selector.ident
-				return btype.X.(*ast.SelectorExpr).Sel.Name == atype.X.(*ast.SelectorExpr).Sel.Name
-			}
-			panic(fmt.Sprintf("unexpected type %T", btype.X))
-		}
-		panic(fmt.Sprintf("unexpected type %T", before[i].Type))
-	}
-	return true
-}
-
 func diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Field) {
 	// Presort after for quicker matching of fieldname -> type, may not be worthwhile
 	AfterMembers := make(map[string]string)
-	for _, field := range after {
-		AfterMembers[field.Names[0].Name] = typeToString(field.Type)
+	for i, field := range after {
+		AfterMembers[fieldKey(field, i)] = typeToString(field.Type)
 	}
 
-	for _, field := range before {
-		if afterType, ok := AfterMembers[field.Names[0].Name]; ok {
+	for i, field := range before {
+		if afterType, ok := AfterMembers[fieldKey(field, i)]; ok {
 			if afterType != typeToString(field.Type) {
 				// changed
 				changed = append(changed, field)
 			}
-			delete(AfterMembers, field.Names[0].Name)
+			delete(AfterMembers, fieldKey(field, i))
 			continue
 		}
 
@@ -290,14 +248,25 @@ func diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Fiel
 
 	// What's left in afterFields has added
 	for member := range AfterMembers {
-		for _, field := range after {
-			if field.Names[0].Name == member {
+		for i, field := range after {
+			if fieldKey(field, i) == member {
 				added = append(added, field)
 			}
 		}
 	}
 
 	return added, removed, changed
+}
+
+// Return an appropriate identifier for a field, if it has an ident (name)
+// such as in the case of a struct/interface member, else, use it's provided
+// position i, such as the case of a function's parameter or result list
+func fieldKey(field *ast.Field, i int) string {
+	if len(field.Names) > 0 {
+		return field.Names[0].Name
+	}
+	// No name, probably a function, return position
+	return strconv.FormatInt(int64(i), 10)
 }
 
 // typeToString returns a type, such as ident or function and returns a string
