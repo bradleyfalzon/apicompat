@@ -3,6 +3,8 @@ added
 changed (breaking change - changed type)
 	const ConstChangeType int = 0
 	const ConstChangeType uint = 0
+added
+	const ConstMultiSpecB int = 0
 removed
 	const ConstRemoved int = 0
 changed (breaking change - parameters types changed)

@@ -2,6 +2,13 @@ package library
 
 import "bytes"
 
+// ConstMultiSpec* checks support for multiple specs
+const (
+	ConstMultiSpecA int = 0
+
+	ConstMultiSpecB int = 0
+)
+
 // ConstAdded detects additions
 const ConstAdded int = 0
 

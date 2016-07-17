@@ -102,23 +102,39 @@ func parseFiles(vcs vcs, rev string, files []string) (map[string]*ast.Package, e
 func getDecls(astDecls []ast.Decl) decls {
 	decls := make(map[string]ast.Decl)
 	for _, astDecl := range astDecls {
-		var (
-			id   string // unique
-			recv string
-		)
 		switch d := astDecl.(type) {
 		case *ast.GenDecl:
-			switch s := d.Specs[0].(type) {
-			case *ast.ValueSpec:
-				// var / const
-				id = s.Names[0].Name
-			case *ast.TypeSpec:
-				// type struct/interface/etc
-				id = s.Name.Name
+			for i := range d.Specs {
+				var (
+					id string
+					// gdecl splits declaration blocks into individual declarations to view
+					// only changed declarations, instead of all, I don't imagine it's needed
+					// for TypeSpec (just ValueSpec
+					gdecl *ast.GenDecl
+				)
+				switch s := d.Specs[i].(type) {
+				case *ast.ValueSpec:
+					// var / const
+					id = s.Names[0].Name
+					gdecl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
+				case *ast.TypeSpec:
+					// type struct/interface/etc
+					id = s.Name.Name
+					gdecl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
+				default:
+					// import or possibly other
+					continue
+				}
+				if ast.IsExported(id) {
+					decls[id] = gdecl
+				}
 			}
 		case *ast.FuncDecl:
 			// function or method
-			id = d.Name.Name
+			var (
+				id   string = d.Name.Name
+				recv string
+			)
 			if d.Recv != nil {
 				expr := d.Recv.List[0].Type
 				switch e := expr.(type) {
@@ -129,12 +145,12 @@ func getDecls(astDecls []ast.Decl) decls {
 				}
 				id = recv + "." + id
 			}
+			// If it's exported and it's either not a receiver OR the receiver is also exported
+			if ast.IsExported(id) && recv == "" || ast.IsExported(recv) {
+				decls[id] = astDecl
+			}
 		default:
 			panic(fmt.Errorf("Unknown decl type: %#v", astDecl))
-		}
-		// If it's exported and it's either not a receiver OR the receiver is also exported
-		if ast.IsExported(id) && recv == "" || ast.IsExported(recv) {
-			decls[id] = astDecl
 		}
 	}
 	return decls
