@@ -26,6 +26,7 @@ type TypeSpecChange struct{}
 // StructAddMember detects additions of struct fields (is not a problem)
 type StructAddMember struct {
 	//Member1 will be added
+	//Member2 will be added
 }
 
 // StructRemMember detects removals of struct fields
