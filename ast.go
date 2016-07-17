@@ -326,8 +326,10 @@ func typeToString(ident ast.Expr) string {
 		for i := range v.Params.List {
 			v.Params.List[i].Names = []*ast.Ident{}
 		}
-		for i := range v.Results.List {
-			v.Results.List[i].Names = []*ast.Ident{}
+		if v.Results != nil {
+			for i := range v.Results.List {
+				v.Results.List[i].Names = []*ast.Ident{}
+			}
 		}
 	}
 	pcfg.Fprint(&buf, &fset, ident)

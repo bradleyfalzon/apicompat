@@ -89,6 +89,9 @@ type IfaceChangeMemberReturn interface {
 // TypeAlias detects changes to alias types
 type TypeAlias uint
 
+// FuncRetEmptyFunc tests handling of a func return bare func
+func FuncRetEmptyFunc() func()
+
 // FuncAddArg detects additions of function parameter types
 func FuncAddArg(arg1 int) {}
 
