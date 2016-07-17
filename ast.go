@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/printer"
 	"go/token"
+	"os"
 	"reflect"
 	"strconv"
 )
@@ -335,4 +336,10 @@ func typeToString(ident ast.Expr) string {
 	pcfg.Fprint(&buf, &fset, ident)
 
 	return buf.String()
+}
+
+// printast is a debug helper to quickly print the go source of an ast
+func printast(ast interface{}) {
+	pcfg := printer.Config{Mode: printer.RawFormat}
+	pcfg.Fprint(os.Stdout, &token.FileSet{}, ast)
 }
