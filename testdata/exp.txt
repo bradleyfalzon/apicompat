@@ -127,6 +127,9 @@ changed (breaking change - changed map's key's type)
 changed (breaking change - changed map's value's type)
 	var VarChangeTypeMapValue map[int]int
 	var VarChangeTypeMapValue map[int]uint
+changed (breaking change - changed type)
+	var VarChangeTypeSelector bytes.Buffer
+	var VarChangeTypeSelector bytes.Reader
 changed (breaking change - changed of array's element's type)
 	var VarChangeTypeSlice []int
 	var VarChangeTypeSlice []uint

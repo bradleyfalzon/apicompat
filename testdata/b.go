@@ -42,11 +42,14 @@ var VarChangeTypeArrayLen [2]int
 // VarChangeTypeArrayType detects a change in an array's type
 var VarChangeTypeArrayType [1]uint
 
-// VarChangeTypeMapKey detects a achange in a map's key
+// VarChangeTypeMapKey detects a change in a map's key
 var VarChangeTypeMapKey map[uint]int
 
-// VarChangeTypeMapValue detects a achange in a map's value
+// VarChangeTypeMapValue detects a change in a map's value
 var VarChangeTypeMapValue map[int]uint
+
+// VarChangeTypeSelector detects a change in a selector.ident
+var VarChangeTypeSelector bytes.Reader
 
 // TypeSpecChange detects a change between types specs
 type TypeSpecChange interface{}
