@@ -6,7 +6,6 @@ import (
 	"go/ast"
 	"go/printer"
 	"go/token"
-	"os"
 	"reflect"
 	"strconv"
 )
@@ -148,16 +147,23 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 			return changeBreaking, "changed spec"
 		}
 
+		if len(b.Specs) != 1 {
+			// getDecls should've already flattened var/const blocks
+			panic("unexpected number of specs")
+		}
+
 		switch bspec := b.Specs[0].(type) {
 		case *ast.ValueSpec:
 			aspec := a.Specs[0].(*ast.ValueSpec)
-			// refactoring opportunity here with equalFieldTypes
 
 			if bspec.Type == nil || aspec.Type == nil {
 				// eg: var ErrSomeError = errors.New("Some Error")
 				// cannot currently determine the type
 				return changeUnknown, "cannot currently determine type"
 			}
+
+			// TODO perhaps just make this entire thing use
+			// exprEqual(bspec.Type, aspect.Type) but we'll lose some details
 
 			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
 				// eg change from int to []int
@@ -196,7 +202,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 					return changeBreaking, "changed map's value's type"
 				}
 			default:
-				panic(fmt.Errorf("Unknown val spec type: %T", btype))
+				panic(fmt.Errorf("Unknown val spec type: %T, source: %s", btype, astString(btype)))
 			}
 		case *ast.TypeSpec:
 			aspec := a.Specs[0].(*ast.TypeSpec)
@@ -348,8 +354,10 @@ func typeToString(ident ast.Expr) string {
 	return buf.String()
 }
 
-// printast is a debug helper to quickly print the go source of an ast
-func printast(ast interface{}) {
+// astString is a debug helper to return the go source of an ast
+func astString(ast interface{}) string {
 	pcfg := printer.Config{Mode: printer.RawFormat}
-	pcfg.Fprint(os.Stdout, &token.FileSet{}, ast)
+	buf := bytes.Buffer{}
+	pcfg.Fprint(&buf, &token.FileSet{}, ast)
+	return buf.String()
 }
