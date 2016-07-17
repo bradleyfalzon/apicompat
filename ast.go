@@ -13,13 +13,16 @@ import (
 type changeType uint8
 
 const (
-	changeNone changeType = iota
+	changeUnknown changeType = iota
+	changeNone
 	changeNonBreaking
 	changeBreaking
 )
 
 func (c changeType) String() string {
 	switch c {
+	case changeUnknown:
+		return "unknowable"
 	case changeNone:
 		return "no change"
 	case changeNonBreaking:
@@ -151,6 +154,12 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 			aspec := a.Specs[0].(*ast.ValueSpec)
 			// refactoring opportunity here with equalFieldTypes
 
+			if bspec.Type == nil || aspec.Type == nil {
+				// eg: var ErrSomeError = errors.New("Some Error")
+				// cannot currently determine the type
+				return changeUnknown, "cannot currently determine type"
+			}
+
 			// var / const
 			if bspec.Type.(*ast.Ident).Name != aspec.Type.(*ast.Ident).Name {
 				// type changed
@@ -275,6 +284,8 @@ func fieldKey(field *ast.Field, i int) string {
 // This is designed to make comparisons simpler by not having to handle all
 // the various ast permutations, but this is the slowest method and may have
 // its own set of undesirable properties (including a performance penalty).
+// See the equivalent func equalFieldTypes in b3b41cc470d4258b38372b87f22d87845ecfecb6
+// for an example of what it might have been (it was missing some checks though)
 func typeToString(ident ast.Expr) string {
 	fset := token.FileSet{} // only require non-nil fset
 	pcfg := printer.Config{Mode: printer.RawFormat}
