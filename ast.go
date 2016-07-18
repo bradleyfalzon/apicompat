@@ -142,14 +142,11 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 	case *ast.GenDecl:
 		a := after.(*ast.GenDecl)
 
+		// getDecls flattened var/const blocks, so .Specs should contain just 1
+
 		if reflect.TypeOf(b.Specs[0]) != reflect.TypeOf(a.Specs[0]) {
 			// Spec changed, such as ValueSpec to TypeSpec (eg var/const to struct)
 			return changeBreaking, "changed spec"
-		}
-
-		if len(b.Specs) != 1 {
-			// getDecls should've already flattened var/const blocks
-			panic("unexpected number of specs")
 		}
 
 		switch bspec := b.Specs[0].(type) {
@@ -201,7 +198,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 					return changeBreaking, "changed map's value's type"
 				}
 			default:
-				panic(fmt.Errorf("Unknown val spec type: %T, source: %s", btype, astString(btype)))
+				panic(fmt.Errorf("Unknown val spec type: %T, source: %s", btype, typeToString(btype)))
 			}
 		case *ast.TypeSpec:
 			aspec := a.Specs[0].(*ast.TypeSpec)
@@ -357,7 +354,7 @@ func exprEqual(before, after ast.Expr) bool {
 // its own set of undesirable properties (including a performance penalty).
 // See the equivalent func equalFieldTypes in b3b41cc470d4258b38372b87f22d87845ecfecb6
 // for an example of what it might have been (it was missing some checks though)
-func typeToString(ident ast.Expr) string {
+func typeToString(ident interface{}) string {
 	fset := token.FileSet{} // only require non-nil fset
 	pcfg := printer.Config{Mode: printer.RawFormat}
 	buf := bytes.Buffer{}
@@ -372,13 +369,5 @@ func typeToString(ident ast.Expr) string {
 	}
 	pcfg.Fprint(&buf, &fset, ident)
 
-	return buf.String()
-}
-
-// astString is a debug helper to return the go source of an ast
-func astString(ast interface{}) string {
-	pcfg := printer.Config{Mode: printer.RawFormat}
-	buf := bytes.Buffer{}
-	pcfg.Fprint(&buf, &token.FileSet{}, ast)
 	return buf.String()
 }

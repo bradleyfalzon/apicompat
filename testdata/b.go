@@ -24,6 +24,9 @@ type GenDeclSpecChange struct{}
 // ConstChangeType detects a change of type for a constant
 const ConstChangeType uint = 0
 
+// ValDynamicType checks for (lack of) support types parser can't easily detect
+var ValDynamicType = bytes.NewBufferString("some error")
+
 // ValChangeType detects a change of type for a constant
 var VarChangeType uint
 
