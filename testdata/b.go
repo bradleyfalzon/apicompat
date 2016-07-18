@@ -51,6 +51,10 @@ var VarChangeTypeMapValue map[int]uint
 // VarChangeTypeSelector detects a change in a selector.ident
 var VarChangeTypeSelector bytes.Reader
 
+// VarChangeTypeStar detects a change in a pointer
+var VarChangeTypeStar *uint
+var VarChangeTypeStarSelector *bytes.Reader
+
 // TypeSpecChange detects a change between types specs
 type TypeSpecChange interface{}
 

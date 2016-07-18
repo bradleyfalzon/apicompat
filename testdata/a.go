@@ -51,6 +51,10 @@ var VarChangeTypeMapValue map[int]int
 // VarChangeTypeSelector detects a change in a selector.ident
 var VarChangeTypeSelector bytes.Buffer
 
+// VarChangeTypeStar detects a change in a pointer
+var VarChangeTypeStar *int
+var VarChangeTypeStarSelector *bytes.Buffer
+
 // TypeSpecChange detects a change between types specs
 type TypeSpecChange struct{}
 

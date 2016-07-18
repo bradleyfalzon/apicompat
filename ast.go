@@ -172,16 +172,9 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 
 			// var / const
 			switch btype := bspec.Type.(type) {
-			case *ast.SelectorExpr:
-				// bytes.Buffer/etc
+			case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
+				// int/string/etc or bytes.Buffer/etc or *int/*bytes.Buffer/etc
 				if !exprEqual(bspec.Type, aspec.Type) {
-					// type changed
-					return changeBreaking, "changed type"
-				}
-			case *ast.Ident:
-				// int/string/etc
-				atype := aspec.Type.(*ast.Ident)
-				if btype.Name != atype.Name {
 					// type changed
 					return changeBreaking, "changed type"
 				}

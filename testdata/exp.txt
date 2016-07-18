@@ -136,6 +136,12 @@ changed (breaking change - changed of array's element's type)
 changed (breaking change - changed of array's length)
 	var VarChangeTypeSliceLen []int
 	var VarChangeTypeSliceLen [1]int
+changed (breaking change - changed type)
+	var VarChangeTypeStar *int
+	var VarChangeTypeStar *uint
+changed (breaking change - changed type)
+	var VarChangeTypeStarSelector *bytes.Buffer
+	var VarChangeTypeStarSelector *bytes.Reader
 changed (breaking change - changed value spec type)
 	var VarChangeValSpecType int
 	var VarChangeValSpecType []int
