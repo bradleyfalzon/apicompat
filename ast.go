@@ -253,7 +253,12 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 		}
 	case *ast.FuncDecl:
 		a := after.(*ast.FuncDecl)
-		added, removed, changed := diffFields(b.Type.Params.List, a.Type.Params.List)
+
+		// don't compare argument names
+		bparams := stripNames(b.Type.Params.List)
+		aparams := stripNames(a.Type.Params.List)
+
+		added, removed, changed := diffFields(bparams, aparams)
 		if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
 			return changeBreaking, "parameters types changed"
 		}
@@ -264,7 +269,11 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				return changeBreaking, "removed return parameter"
 			}
 
-			_, removed, changed := diffFields(b.Type.Results.List, a.Type.Results.List)
+			// don't compare argument names
+			bresults := stripNames(b.Type.Results.List)
+			aresults := stripNames(a.Type.Results.List)
+
+			_, removed, changed := diffFields(bresults, aresults)
 			// Only check if we're changing/removing return parameters
 			if len(removed) > 0 || len(changed) > 0 {
 				return changeBreaking, "changed or removed return parameter"
@@ -274,6 +283,23 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 		panic(fmt.Errorf("Unknown type: %T", before))
 	}
 	return changeNone, ""
+}
+
+// stripNames strips the names from a fieldlist, which is usually a function's
+// (or method's) parameter or results list, these are internal to the function.
+// This returns a good-enough copy of the field list, but isn't a complete copy.
+func stripNames(fields []*ast.Field) []*ast.Field {
+	stripped := make([]*ast.Field, 0, len(fields))
+	for _, f := range fields {
+		stripped = append(stripped, &ast.Field{
+			Doc:     f.Doc,
+			Names:   nil, // nil the names
+			Type:    f.Type,
+			Tag:     f.Tag,
+			Comment: f.Comment,
+		})
+	}
+	return stripped
 }
 
 func diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Field) {
@@ -338,14 +364,10 @@ func typeToString(ident ast.Expr) string {
 
 	switch v := ident.(type) {
 	case *ast.FuncType:
-		// strip variable names in functions
-		for i := range v.Params.List {
-			v.Params.List[i].Names = []*ast.Ident{}
-		}
+		// strip variable names in methods
+		v.Params.List = stripNames(v.Params.List)
 		if v.Results != nil {
-			for i := range v.Results.List {
-				v.Results.List[i].Names = []*ast.Ident{}
-			}
+			v.Results.List = stripNames(v.Results.List)
 		}
 	}
 	pcfg.Fprint(&buf, &fset, ident)

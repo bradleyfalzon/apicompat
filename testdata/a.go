@@ -105,6 +105,9 @@ type TypeAlias int
 // FuncRetEmptyFunc tests handling of a func return bare func
 func FuncRetEmptyFunc() func()
 
+// FuncRenameArg tests ignorance of changes in variable names
+func FuncRenameArg(arg1 int) (ret1 error) {}
+
 // FuncAddArg detects additions of function parameter types
 func FuncAddArg() {}
 

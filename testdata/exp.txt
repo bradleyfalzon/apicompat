@@ -77,17 +77,17 @@ changed (breaking change - members added)
 	}
 changed (breaking change - members changed types)
 	type IfaceChangeMemberArg interface {
-		Member1(int) (bool)
+		Member1(int) bool
 	}
 	type IfaceChangeMemberArg interface {
-		Member1(uint) (bool)
+		Member1(uint) bool
 	}
 changed (breaking change - members changed types)
 	type IfaceChangeMemberReturn interface {
-		Member1(int) (bool)
+		Member1(int) bool
 	}
 	type IfaceChangeMemberReturn interface {
-		Member1(int) (int)
+		Member1(int) int
 	}
 changed (non-breaking change - members removed)
 	type IfaceRemMember interface {
