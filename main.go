@@ -31,7 +31,6 @@ func main() {
 	}
 
 	for pkgName, decls := range oldDecls {
-		fmt.Printf("Processing pkg %s with %d declarations\n", pkgName, len(decls))
 		if _, ok := newDecls[pkgName]; ok {
 			changes := diff(decls, newDecls[pkgName])
 			sort.Sort(byID(changes))
@@ -147,6 +146,9 @@ func getDecls(astDecls []ast.Decl) decls {
 			}
 			// If it's exported and it's either not a receiver OR the receiver is also exported
 			if ast.IsExported(id) && recv == "" || ast.IsExported(recv) {
+				// We're not interested in the body, nil it, alternatively we could set an
+				// Body.List, but that included parenthesis on different lines when printed
+				astDecl.(*ast.FuncDecl).Body = nil
 				decls[id] = astDecl
 			}
 		default:

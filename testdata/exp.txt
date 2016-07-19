@@ -8,68 +8,38 @@ added
 removed
 	const ConstRemoved int = 0
 changed (breaking change - parameters types changed)
-	func FuncAddArg() {
-	}
-	func FuncAddArg(arg1 int) {
-	}
+	func FuncAddArg()
+	func FuncAddArg(arg1 int)
 changed (breaking change - parameters types changed)
-	func FuncChangeArg(arg1 int) {
-	}
-	func FuncChangeArg(param uint) {
-	}
+	func FuncChangeArg(arg1 int)
+	func FuncChangeArg(param uint)
 changed (breaking change - changed or removed return parameter)
-	func FuncChangeRet() error {
-		return nil
-	}
-	func FuncChangeRet() bool {
-		return false
-	}
+	func FuncChangeRet() error
+	func FuncChangeRet() bool
 changed (breaking change - changed or removed return parameter)
-	func FuncChangeRetStarIdent() *int {
-		return nil
-	}
-	func FuncChangeRetStarIdent() *uint {
-		return nil
-	}
+	func FuncChangeRetStarIdent() *int
+	func FuncChangeRetStarIdent() *uint
 changed (breaking change - changed or removed return parameter)
-	func FuncChangeRetStarSelector() *bytes.Buffer {
-		return nil
-	}
-	func FuncChangeRetStarSelector() *bytes.Reader {
-		return nil
-	}
+	func FuncChangeRetStarSelector() *bytes.Buffer
+	func FuncChangeRetStarSelector() *bytes.Reader
 changed (breaking change - parameters types changed)
-	func (_ *FuncRecv) Method1(arg1 int) (ret1 error) {
-		return nil
-	}
-	func (_ *FuncRecv) Method1(arg1 bool) (ret1 int) {
-		return 1
-	}
+	func (_ *FuncRecv) Method1(arg1 int) (ret1 error)
+	func (_ *FuncRecv) Method1(arg1 bool) (ret1 int)
 changed (breaking change - parameters types changed)
-	func (_ FuncRecv) Method2(arg1 int) (ret1 error) {
-		return nil
-	}
-	func (_ FuncRecv) Method2(arg1 bool) (ret1 int) {
-		return 1
-	}
+	func (_ FuncRecv) Method2(arg1 int) (ret1 error)
+	func (_ FuncRecv) Method2(arg1 bool) (ret1 int)
 changed (breaking change - parameters types changed)
-	func FuncRemArg(arg1 int) {
-	}
-	func FuncRemArg() {
-	}
+	func FuncRemArg(arg1 int)
+	func FuncRemArg()
 changed (breaking change - removed return parameter)
-	func FuncRemRet() error {
-		return nil
-	}
-	func FuncRemRet() {
-	}
+	func FuncRemRet() error
+	func FuncRemRet()
 changed (breaking change - changed spec)
 	const GenDeclSpecChange int = 1
 	type GenDeclSpecChange struct{}
 changed (breaking change - changed declaration)
 	const GenFuncDeclChange int = 1
-	func GenFuncDeclChange() {
-	}
+	func GenFuncDeclChange()
 changed (breaking change - members added)
 	type IfaceAddMember interface{}
 	type IfaceAddMember interface {
