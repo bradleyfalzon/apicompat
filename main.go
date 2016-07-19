@@ -18,15 +18,15 @@ func main() {
 	// new vcs
 	var vcs git
 
-	oldDecls, err := parse(vcs, oldRevID)
-	if err != nil {
-		fmt.Printf("Error parsing %s: %s\n", oldRevID, err.Error())
-		os.Exit(1)
-	}
-
 	newDecls, err := parse(vcs, newRevID)
 	if err != nil {
 		fmt.Printf("Error parsing %s: %s\n", newRevID, err.Error())
+		os.Exit(1)
+	}
+
+	oldDecls, err := parse(vcs, oldRevID)
+	if err != nil {
+		fmt.Printf("Error parsing %s: %s\n", oldRevID, err.Error())
 		os.Exit(1)
 	}
 
