@@ -197,6 +197,10 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				if !exprEqual(btype.Value, atype.Value) {
 					return changeBreaking, "changed map's value's type"
 				}
+			case *ast.FuncType:
+				// func
+				atype := aspec.Type.(*ast.FuncType)
+				return compareFuncType(btype, atype)
 			default:
 				panic(fmt.Errorf("Unknown val spec type: %T, source: %s", btype, typeToString(btype)))
 			}
@@ -250,35 +254,40 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 		}
 	case *ast.FuncDecl:
 		a := after.(*ast.FuncDecl)
-
-		// don't compare argument names
-		bparams := stripNames(b.Type.Params.List)
-		aparams := stripNames(a.Type.Params.List)
-
-		added, removed, changed := diffFields(bparams, aparams)
-		if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
-			return changeBreaking, "parameters types changed"
-		}
-
-		if b.Type.Results != nil {
-			if a.Type.Results == nil {
-				// removed return parameter
-				return changeBreaking, "removed return parameter"
-			}
-
-			// don't compare argument names
-			bresults := stripNames(b.Type.Results.List)
-			aresults := stripNames(a.Type.Results.List)
-
-			_, removed, changed := diffFields(bresults, aresults)
-			// Only check if we're changing/removing return parameters
-			if len(removed) > 0 || len(changed) > 0 {
-				return changeBreaking, "changed or removed return parameter"
-			}
-		}
+		return compareFuncType(b.Type, a.Type)
 	default:
 		panic(fmt.Errorf("Unknown type: %T", before))
 	}
+	return changeNone, ""
+}
+
+func compareFuncType(before, after *ast.FuncType) (changeType, string) {
+	// don't compare argument names
+	bparams := stripNames(before.Params.List)
+	aparams := stripNames(after.Params.List)
+
+	added, removed, changed := diffFields(bparams, aparams)
+	if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
+		return changeBreaking, "parameters types changed"
+	}
+
+	if before.Results != nil {
+		if after.Results == nil {
+			// removed return parameter
+			return changeBreaking, "removed return parameter"
+		}
+
+		// don't compare argument names
+		bresults := stripNames(before.Results.List)
+		aresults := stripNames(after.Results.List)
+
+		_, removed, changed := diffFields(bresults, aresults)
+		// Only check if we're changing/removing return parameters
+		if len(removed) > 0 || len(changed) > 0 {
+			return changeBreaking, "changed or removed return parameter"
+		}
+	}
+
 	return changeNone, ""
 }
 

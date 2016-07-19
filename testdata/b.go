@@ -33,6 +33,24 @@ var VarChangeType uint
 // VarChangeValSpecType detects a change between val spec types
 var VarChangeValSpecType []int
 
+// VarChangeTypeFunc detects support for var funcs
+var VarChangeTypeFunc func(arg1 int) (err error)
+
+// VarChangeTypeFuncArgRename detects ignorance of argument name changes
+var VarChangeTypeFuncArgRename func(arg2 int) (err2 error)
+
+// VarChangeTypeFuncParam detects a change in a func's parameter list
+var VarChangeTypeFuncParam func(uint) error
+
+// VarChangeTypeFuncResult detects a change in a func's return list
+var VarChangeTypeFuncResult func(int) bool
+
+// VarAddTypeFuncResult detects an add in a func's return list (this is ok)
+var VarAddTypeFuncResult func(int) error
+
+// VarRemoveTypeFuncResult detects a removal in a func's return list
+var VarRemoveTypeFuncResult func(int)
+
 // VarChangeTypeSlice detects a change in a slice's type
 var VarChangeTypeSlice []uint
 
