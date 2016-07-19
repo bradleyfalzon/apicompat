@@ -33,6 +33,9 @@ var VarChangeType int
 // VarChangeValSpecType detects a change between val spec types
 var VarChangeValSpecType int
 
+// VarChangeTypeStruct detects support for var (anonymous) struct
+var VarChangeTypeStruct struct{}
+
 // VarChangeTypeFunc detects support for var funcs
 var VarChangeTypeFunc func(arg1 int) (err error)
 

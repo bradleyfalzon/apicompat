@@ -201,6 +201,10 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				// func
 				atype := aspec.Type.(*ast.FuncType)
 				return compareFuncType(btype, atype)
+			case *ast.StructType:
+				// anonymous struct
+				atype := aspec.Type.(*ast.StructType)
+				return compareStructType(btype, atype)
 			default:
 				panic(fmt.Errorf("Unknown val spec type: %T, source: %s", btype, typeToString(btype)))
 			}
@@ -231,18 +235,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				}
 			case *ast.StructType:
 				atype := aspec.Type.(*ast.StructType)
-
-				// structs don't care if fields were added
-				added, removed, changed := diffFields(btype.Fields.List, atype.Fields.List)
-				if len(removed) > 0 {
-					// Fields were removed
-					return changeBreaking, "members removed"
-				} else if len(changed) > 0 {
-					// Fields changed types
-					return changeBreaking, "members changed types"
-				} else if len(added) > 0 {
-					return changeNonBreaking, "members added"
-				}
+				return compareStructType(btype, atype)
 			case *ast.Ident:
 				// alias
 				atype := aspec.Type.(*ast.Ident)
@@ -261,6 +254,20 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 	return changeNone, ""
 }
 
+func compareStructType(before, after *ast.StructType) (changeType, string) {
+	// structs don't care if fields were added
+	added, removed, changed := diffFields(before.Fields.List, after.Fields.List)
+	if len(removed) > 0 {
+		// Fields were removed
+		return changeBreaking, "members removed"
+	} else if len(changed) > 0 {
+		// Fields changed types
+		return changeBreaking, "members changed types"
+	} else if len(added) > 0 {
+		return changeNonBreaking, "members added"
+	}
+	return changeNone, ""
+}
 func compareFuncType(before, after *ast.FuncType) (changeType, string) {
 	// don't compare argument names
 	bparams := stripNames(before.Params.List)
