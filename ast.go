@@ -218,6 +218,10 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				if !exprEqual(btype.Value, atype.Value) {
 					return changeBreaking, "changed map's value's type"
 				}
+			case *ast.InterfaceType:
+				// this is a special case for just interface{}
+				atype := aspec.Type.(*ast.InterfaceType)
+				return compareInterfaceType(btype, atype)
 			case *ast.ChanType:
 				// channel
 				atype := aspec.Type.(*ast.ChanType)
@@ -246,18 +250,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 			switch btype := bspec.Type.(type) {
 			case *ast.InterfaceType:
 				atype := aspec.Type.(*ast.InterfaceType)
-
-				// interfaces don't care if methods are removed
-				added, removed, changed := diffFields(btype.Methods.List, atype.Methods.List)
-				if len(added) > 0 {
-					// Fields were added
-					return changeBreaking, "members added"
-				} else if len(changed) > 0 {
-					// Fields changed types
-					return changeBreaking, "members changed types"
-				} else if len(removed) > 0 {
-					return changeNonBreaking, "members removed"
-				}
+				return compareInterfaceType(btype, atype)
 			case *ast.StructType:
 				atype := aspec.Type.(*ast.StructType)
 				return compareStructType(btype, atype)
@@ -295,6 +288,21 @@ func compareChanType(before, after *ast.ChanType) (changeType, string) {
 	return changeNone, ""
 }
 
+func compareInterfaceType(before, after *ast.InterfaceType) (changeType, string) {
+	// interfaces don't care if methods are removed
+	added, removed, changed := diffFields(before.Methods.List, after.Methods.List)
+	if len(added) > 0 {
+		// Fields were added
+		return changeBreaking, "members added"
+	} else if len(changed) > 0 {
+		// Fields changed types
+		return changeBreaking, "members changed types"
+	} else if len(removed) > 0 {
+		return changeNonBreaking, "members removed"
+	}
+
+	return changeNone, ""
+}
 func compareStructType(before, after *ast.StructType) (changeType, string) {
 	// structs don't care if fields were added
 	added, removed, changed := diffFields(before.Fields.List, after.Fields.List)

@@ -36,6 +36,9 @@ var VarChangeValSpecType int
 // VarChangeTypeStruct detects support for var (anonymous) struct
 var VarChangeTypeStruct struct{}
 
+// VarChangeTypeInterface detects support for var interface{}
+var VarChangeTypeInterface interface{}
+
 // VarChangeTypeChan detects changes in var chan
 var VarChangeTypeChan chan int
 
