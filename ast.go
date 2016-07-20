@@ -231,7 +231,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				atype := aspec.Type.(*ast.StructType)
 				return compareStructType(btype, atype)
 			default:
-				return changeError, fmt.Sprintf("Unknown val spec type: %T, source: %s", btype, typeToString(btype))
+				return changeError, fmt.Sprintf("Unknown val spec type: %T, source: %s", btype, typeToString(before))
 			}
 		case *ast.TypeSpec:
 			aspec := a.Specs[0].(*ast.TypeSpec)

@@ -32,7 +32,10 @@ func TestParse(t *testing.T) {
 	got := bytes.NewBufferString("")
 	for pkgName, decls := range oldDecls {
 		if _, ok := newDecls[pkgName]; ok {
-			_, changes := diff(decls, newDecls[pkgName])
+			err, changes := diff(decls, newDecls[pkgName])
+			if err != nil {
+				t.Fatal(err)
+			}
 			sort.Sort(byID(changes))
 			for _, change := range changes {
 				fmt.Fprint(got, change)
