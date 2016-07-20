@@ -13,7 +13,8 @@ import (
 type changeType uint8
 
 const (
-	changeUnknown changeType = iota
+	changeError changeType = iota
+	changeUnknown
 	changeNone
 	changeNonBreaking
 	changeBreaking
@@ -21,6 +22,8 @@ const (
 
 func (c changeType) String() string {
 	switch c {
+	case changeError:
+		return "parse error"
 	case changeUnknown:
 		return "unknowable"
 	case changeNone:
@@ -92,7 +95,19 @@ func (a byID) Less(i, j int) bool { return a[i].id < a[j].id }
 // name to match declarations for before and after
 type decls map[string]ast.Decl
 
-func diff(bdecls, adecls decls) []change {
+type diffError struct {
+	summary string
+	bdecl,
+	adecl ast.Decl
+	bpos,
+	apos token.Pos
+}
+
+func (e diffError) Error() string {
+	return e.summary
+}
+
+func diff(bdecls, adecls decls) (error, []change) {
 	var changes []change
 	for id, decl := range bdecls {
 		if _, ok := adecls[id]; !ok {
@@ -103,8 +118,14 @@ func diff(bdecls, adecls decls) []change {
 
 		// in before and in after, check if there's a difference
 		changeType, summary := compareDecl(bdecls[id], adecls[id])
-		if changeType == changeNone || changeType == changeUnknown {
+
+		switch changeType {
+		case changeNone, changeUnknown:
 			continue
+		case changeError:
+			err := &diffError{summary: summary, bdecl: bdecls[id], adecl: adecls[id]}
+			//err := &diffError{summary: summary, bpos: bdecls[id].Pos(), apos: adecls[id].Pos()}
+			return err, changes
 		}
 
 		changes = append(changes, change{
@@ -124,7 +145,7 @@ func diff(bdecls, adecls decls) []change {
 		}
 	}
 
-	return changes
+	return nil, changes
 }
 
 // equal compares two declarations and returns true if they do not have
@@ -210,7 +231,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				atype := aspec.Type.(*ast.StructType)
 				return compareStructType(btype, atype)
 			default:
-				panic(fmt.Errorf("Unknown val spec type: %T, source: %s", btype, typeToString(btype)))
+				return changeError, fmt.Sprintf("Unknown val spec type: %T, source: %s", btype, typeToString(btype))
 			}
 		case *ast.TypeSpec:
 			aspec := a.Specs[0].(*ast.TypeSpec)
@@ -253,7 +274,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 		a := after.(*ast.FuncDecl)
 		return compareFuncType(b.Type, a.Type)
 	default:
-		panic(fmt.Errorf("Unknown type: %T", before))
+		return changeError, fmt.Sprintf("Unknown declaration type: %T, source: %s", before, typeToString(before))
 	}
 	return changeNone, ""
 }
@@ -403,6 +424,7 @@ func exprEqual(before, after ast.Expr) bool {
 // for an example of what it might have been (it was missing some checks though)
 func typeToString(ident interface{}) string {
 	fset := token.FileSet{} // only require non-nil fset
+	// TODO do i need to use the printer? ast has print functions, do they just wrap this?
 	pcfg := printer.Config{Mode: printer.RawFormat}
 	buf := bytes.Buffer{}
 

@@ -26,13 +26,13 @@ func TestParse(t *testing.T) {
 	vcs.SetFile("rev1", "abitest.go", rev1)
 	vcs.SetFile("rev2", "abitest.go", rev2)
 
-	oldDecls, err := parse(vcs, "rev1")
-	newDecls, err := parse(vcs, "rev2")
+	_, oldDecls, err := parse(vcs, "rev1")
+	_, newDecls, err := parse(vcs, "rev2")
 
 	got := bytes.NewBufferString("")
 	for pkgName, decls := range oldDecls {
 		if _, ok := newDecls[pkgName]; ok {
-			changes := diff(decls, newDecls[pkgName])
+			_, changes := diff(decls, newDecls[pkgName])
 			sort.Sort(byID(changes))
 			for _, change := range changes {
 				fmt.Fprint(got, change)
