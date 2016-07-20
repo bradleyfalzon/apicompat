@@ -36,6 +36,15 @@ var VarChangeValSpecType int
 // VarChangeTypeStruct detects support for var (anonymous) struct
 var VarChangeTypeStruct struct{}
 
+// VarChangeTypeChan detects changes in var chan
+var VarChangeTypeChan chan int
+
+// VarChangeTypeChanDirection detects changes in chan direction
+var VarChangeTypeChanDir chan int
+
+// VarChangeTypeChanDirection detects removing chan direction (this is ok)
+var VarChangeTypeChanDirRelax <-chan int
+
 // VarChangeTypeFunc detects support for var funcs
 var VarChangeTypeFunc func(arg1 int) (err error)
 
@@ -140,6 +149,15 @@ func FuncRemArg(arg1 int) {}
 
 // FuncChangeArg detects changes of function parameter types
 func FuncChangeArg(arg1 int) {}
+
+// FuncChangeChan detects changes of function channel parameter types
+func FuncChangeChan(arg1 chan int) {}
+
+// FuncChangeChanDir detects changes of function channel parameter types' direction
+func FuncChangeChanDir(arg1 chan int) {}
+
+// FuncChangeChanDirRelax detects relaxion of channel parameter type
+func FuncChangeChanDirRelax(arg1 <-chan int) {}
 
 // FuncAddRet detects additions of function return params (is not a problem)
 func FuncAddRet() {}

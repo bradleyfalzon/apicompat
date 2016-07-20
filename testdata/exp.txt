@@ -13,6 +13,12 @@ changed (breaking change - parameters types changed)
 changed (breaking change - parameters types changed)
 	func FuncChangeArg(arg1 int)
 	func FuncChangeArg(param uint)
+changed (breaking change - parameters types changed)
+	func FuncChangeChan(arg1 chan int)
+	func FuncChangeChan(arg1 chan uint)
+changed (breaking change - parameters types changed)
+	func FuncChangeChanDir(arg1 chan int)
+	func FuncChangeChanDir(arg1 <-chan int)
 changed (breaking change - changed or removed return parameter)
 	func FuncChangeRet() error
 	func FuncChangeRet() bool
@@ -91,6 +97,15 @@ changed (breaking change - changed of array's length)
 changed (breaking change - changed of array's element's type)
 	var VarChangeTypeArrayType [1]int
 	var VarChangeTypeArrayType [1]uint
+changed (breaking change - changed channel's type)
+	var VarChangeTypeChan chan int
+	var VarChangeTypeChan chan uint
+changed (breaking change - changed channel's direction)
+	var VarChangeTypeChanDir chan int
+	var VarChangeTypeChanDir <-chan int
+changed (non-breaking change - removed channel's direction)
+	var VarChangeTypeChanDirRelax <-chan int
+	var VarChangeTypeChanDirRelax chan int
 changed (breaking change - parameters types changed)
 	var VarChangeTypeFuncParam func(int) error
 	var VarChangeTypeFuncParam func(uint) error

@@ -197,6 +197,10 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				if !exprEqual(btype.Value, atype.Value) {
 					return changeBreaking, "changed map's value's type"
 				}
+			case *ast.ChanType:
+				// channel
+				atype := aspec.Type.(*ast.ChanType)
+				return compareChanType(btype, atype)
 			case *ast.FuncType:
 				// func
 				atype := aspec.Type.(*ast.FuncType)
@@ -250,6 +254,22 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 		return compareFuncType(b.Type, a.Type)
 	default:
 		panic(fmt.Errorf("Unknown type: %T", before))
+	}
+	return changeNone, ""
+}
+
+func compareChanType(before, after *ast.ChanType) (changeType, string) {
+	if !exprEqual(before.Value, after.Value) {
+		return changeBreaking, "changed channel's type"
+	}
+
+	// If we're specifying a direction and it's not the same as before
+	// (if we remove direction then that change isn't breaking)
+	if before.Dir != after.Dir {
+		if after.Dir != ast.SEND && after.Dir != ast.RECV {
+			return changeNonBreaking, "removed channel's direction"
+		}
+		return changeBreaking, "changed channel's direction"
 	}
 	return changeNone, ""
 }
@@ -358,6 +378,17 @@ func fieldKey(field *ast.Field, i int) string {
 
 // exprEqual compares two ast.Expr to determine if they are equal
 func exprEqual(before, after ast.Expr) bool {
+	if reflect.TypeOf(before) != reflect.TypeOf(after) {
+		return false
+	}
+
+	switch btype := before.(type) {
+	case *ast.ChanType:
+		atype := after.(*ast.ChanType)
+		change, _ := compareChanType(btype, atype)
+		return change != changeBreaking
+	}
+
 	// For the moment just use typeToString and compare strings
 	return typeToString(before) == typeToString(after)
 }
