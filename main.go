@@ -20,13 +20,13 @@ func main() {
 
 	newDecls, err := parse(vcs, newRevID)
 	if err != nil {
-		fmt.Printf("Error parsing %s: %s\n", newRevID, err.Error())
+		fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", newRevID, err.Error())
 		os.Exit(1)
 	}
 
 	oldDecls, err := parse(vcs, oldRevID)
 	if err != nil {
-		fmt.Printf("Error parsing %s: %s\n", oldRevID, err.Error())
+		fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", oldRevID, err.Error())
 		os.Exit(1)
 	}
 
