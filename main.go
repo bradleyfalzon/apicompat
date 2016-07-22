@@ -119,7 +119,8 @@ func getDecls(astDecls []ast.Decl) decls {
 				id   string = d.Name.Name
 				recv string
 			)
-			if d.Recv != nil {
+			// check if we have a receiver (and not just `func () Method() {}`)
+			if d.Recv != nil && len(d.Recv.List) > 0 {
 				expr := d.Recv.List[0].Type
 				switch e := expr.(type) {
 				case *ast.Ident:

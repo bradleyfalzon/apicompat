@@ -179,6 +179,9 @@ type FuncRecv struct{}
 func (_ *FuncRecv) Method1(arg1 bool) (ret1 int) { return 1 }
 func (_ FuncRecv) Method2(arg1 bool) (ret1 int)  { return 1 }
 
+// Check support for methods with empty recv list
+func () Method() {}
+
 //var VarExp int = 1
 //var varPriv int = 1
 
