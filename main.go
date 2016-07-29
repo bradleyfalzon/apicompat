@@ -7,28 +7,46 @@ import (
 	"go/token"
 	"os"
 	"sort"
+	"sync"
 )
 
 func main() {
 	const (
-		oldRevID = "HEAD~1"
-		newRevID = "HEAD"
+		oldRev = "HEAD~1"
+		newRev = "HEAD"
 	)
 
-	// new vcs
-	var vcs git
+	var (
+		vcs      git
+		err      error
+		wg       sync.WaitGroup
+		newFset  *token.FileSet
+		oldFset  *token.FileSet
+		newDecls map[string]decls
+		oldDecls map[string]decls
+	)
 
-	newFset, newDecls, err := parse(vcs, newRevID)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", newRevID, err.Error())
-		os.Exit(1)
-	}
+	wg.Add(1)
+	go func() {
+		oldFset, oldDecls, err = parse(vcs, oldRev)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", oldRev, err.Error())
+			os.Exit(1)
+		}
+		wg.Done()
+	}()
 
-	oldFset, oldDecls, err := parse(vcs, oldRevID)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", oldRevID, err.Error())
-		os.Exit(1)
-	}
+	wg.Add(1)
+	go func() {
+		newFset, newDecls, err = parse(vcs, newRev)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", newRev, err.Error())
+			os.Exit(1)
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
 
 	for pkgName, decls := range oldDecls {
 		if _, ok := newDecls[pkgName]; ok {
