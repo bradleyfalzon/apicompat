@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"sync"
+	"time"
 )
 
 func main() {
@@ -26,6 +27,7 @@ func main() {
 		oldDecls map[string]decls
 	)
 
+	start := time.Now()
 	wg.Add(1)
 	go func() {
 		oldFset, oldDecls, err = parse(vcs, oldRev)
@@ -47,9 +49,15 @@ func main() {
 	}()
 
 	wg.Wait()
+	parseTime := time.Since(start)
 
+	var (
+		diffTime time.Duration
+		sortTime time.Duration
+	)
 	for pkgName, decls := range oldDecls {
 		if _, ok := newDecls[pkgName]; ok {
+			start = time.Now()
 			err, changes := diff(decls, newDecls[pkgName])
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
@@ -59,13 +67,18 @@ func main() {
 				}
 				return
 			}
+			diffTime += time.Since(start)
 
+			start = time.Now()
 			sort.Sort(byID(changes))
 			for _, change := range changes {
 				fmt.Println(change)
 			}
+			sortTime += time.Since(start)
 		}
 	}
+
+	fmt.Printf("Parse time: %v, Diff time: %v, Sort time: %v", parseTime, diffTime, sortTime)
 }
 
 func parse(vcs vcs, rev string) (*token.FileSet, map[string]decls, error) {
