@@ -1,4 +1,4 @@
-package main
+package abicheck
 
 import (
 	"fmt"
@@ -11,28 +11,42 @@ import (
 	"time"
 )
 
-func main() {
-	const (
-		oldRev = "HEAD~1"
-		newRev = "HEAD"
-	)
+type Checker struct {
+	vcs    vcs
+	oldRev string
+	newRev string
+}
 
+func New(oldRev, newRev string) *Checker {
+	return &Checker{
+		vcs:    Git{}, // TODO make checker auto discover
+		oldRev: oldRev,
+		newRev: newRev,
+	}
+}
+
+func (c *Checker) Check() {
 	var (
-		vcs      git
 		err      error
 		wg       sync.WaitGroup
 		newFset  *token.FileSet
 		oldFset  *token.FileSet
 		newDecls map[string]decls
 		oldDecls map[string]decls
+
+		parseTime time.Duration
+		diffTime  time.Duration
+		sortTime  time.Duration
 	)
+
+	// TODO continue to refactor to be more library friendly (no printing, no exit etc).
 
 	start := time.Now()
 	wg.Add(1)
 	go func() {
-		oldFset, oldDecls, err = parse(vcs, oldRev)
+		oldFset, oldDecls, err = parse(c.vcs, c.oldRev)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", oldRev, err.Error())
+			fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", c.oldRev, err.Error())
 			os.Exit(1)
 		}
 		wg.Done()
@@ -40,21 +54,17 @@ func main() {
 
 	wg.Add(1)
 	go func() {
-		newFset, newDecls, err = parse(vcs, newRev)
+		newFset, newDecls, err = parse(c.vcs, c.newRev)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", newRev, err.Error())
+			fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", c.newRev, err.Error())
 			os.Exit(1)
 		}
 		wg.Done()
 	}()
 
 	wg.Wait()
-	parseTime := time.Since(start)
+	parseTime = time.Since(start)
 
-	var (
-		diffTime time.Duration
-		sortTime time.Duration
-	)
 	for pkgName, decls := range oldDecls {
 		if _, ok := newDecls[pkgName]; ok {
 			start = time.Now()
@@ -89,6 +99,7 @@ func parse(vcs vcs, rev string) (*token.FileSet, map[string]decls, error) {
 
 	fset := token.NewFileSet()
 	decls := make(map[string]decls) // package to id to decls
+	// TODO is there a concurrency opportunity here?
 	for _, file := range files {
 		contents, err := vcs.ReadFile(rev, file)
 		if err != nil {

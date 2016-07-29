@@ -9,7 +9,7 @@ notes/commit messages.
 Try it:
 
 ```
-go get -u github.com/bradleyfalzon/abicheck/cmd/abicheck`
+go get -u github.com/bradleyfalzon/abicheck/cmd/abicheck
 cd /your/project/dir/with/comitted/changes
 abicheck
 ```
