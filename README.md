@@ -24,11 +24,13 @@ abicheck
     a breaking change, this isn't always true).
 - Adding Mercurial, SVN and potentially other VCS systems.
 - Improve VCS options such as:
-    - choosing the versions to compare,
-    - checking of unstaged changes (currently only checks committed changes),
-    - filtering `vendor/` directories,
-    - check subdirectories if ran from a subdirectory of the VCS (currently checks all committed code)
+    - Choosing the versions to compare
+    - Checking of unstaged changes (currently only checks committed changes)
+    - Filtering `vendor/` directories
+    - Check subdirectories if ran from a subdirectory of the VCS (currently checks all committed code)
 - Add docs, flow diagram and fixing of existing docs
+- Improve output formats, such as vim quickfix
+- Move these tasks to GitHub issues
 - Once all other steps have been completed, performance will be investigated
 
 # Testing
