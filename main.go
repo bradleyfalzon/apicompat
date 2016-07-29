@@ -19,7 +19,7 @@ type Checker struct {
 
 func New(oldRev, newRev string) *Checker {
 	return &Checker{
-		vcs:    Git{}, // TODO make checker auto discover
+		vcs:    git{}, // TODO make checker auto discover
 		oldRev: oldRev,
 		newRev: newRev,
 	}

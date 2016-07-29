@@ -28,6 +28,7 @@ abicheck
     - checking of unstaged changes (currently only checks committed changes),
     - filtering `vendor/` directories,
     - check subdirectories if ran from a subdirectory of the VCS (currently checks all committed code)
+- Add docs, flow diagram and fixing of existing docs
 - Once all other steps have been completed, performance will be investigated
 
 # Testing
