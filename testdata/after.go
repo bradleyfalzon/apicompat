@@ -183,7 +183,7 @@ func (_ *FuncRecv) Method1(arg1 bool) (ret1 int) { return 1 }
 func (_ FuncRecv) Method2(arg1 bool) (ret1 int)  { return 1 }
 
 // Check support for methods with empty recv list
-func () Method() {}
+//func () Method() {} // TODO add this back via tests, go/types won't parse it
 
 //var VarExp int = 1
 //var varPriv int = 1

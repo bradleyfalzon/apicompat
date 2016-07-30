@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/printer"
 	"go/token"
+	"go/types"
 	"sort"
 	"sync"
 	"time"
@@ -22,6 +24,8 @@ type Checker struct {
 	aFset  *token.FileSet
 	bDecls revDecls
 	aDecls revDecls
+	bTypes map[string]*types.Checker
+	aTypes map[string]*types.Checker
 	err    error
 
 	parseTime time.Duration
@@ -46,13 +50,13 @@ func (c *Checker) Check() ([]Change, error) {
 	start := time.Now()
 	wg.Add(1)
 	go func() {
-		c.bFset, c.bDecls = c.parse(c.bName)
+		c.bFset, c.bDecls, c.bTypes = c.parse(c.bName)
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		c.aFset, c.aDecls = c.parse(c.aName)
+		c.aFset, c.aDecls, c.aTypes = c.parse(c.aName)
 		wg.Done()
 	}()
 
@@ -84,28 +88,35 @@ func (c *Checker) Check() ([]Change, error) {
 	return changes, nil
 }
 
-func (c *Checker) parse(rev string) (*token.FileSet, revDecls) {
+func (c *Checker) parse(rev string) (*token.FileSet, revDecls, map[string]*types.Checker) {
 	files, err := c.vcs.ReadDir(rev, "")
 	if err != nil {
 		c.err = err
-		return nil, nil
+		return nil, nil, nil
+	}
+
+	typConfig := &types.Config{
+		IgnoreFuncBodies:         true,
+		DisableUnusedImportCheck: true,
+		Importer:                 importer.Default(),
 	}
 
 	fset := token.NewFileSet()
+	typs := make(map[string]*types.Checker)
 	decls := make(map[string]map[string]ast.Decl) // package to id to decls
 	// TODO is there a concurrency opportunity here?
 	for _, file := range files {
 		contents, err := c.vcs.ReadFile(rev, file)
 		if err != nil {
 			c.err = fmt.Errorf("could not read file %s at revision %s: %s", file, rev, err)
-			return nil, nil
+			return nil, nil, nil
 		}
 
 		filename := rev + ":" + file
 		src, err := parser.ParseFile(fset, filename, contents, 0)
 		if err != nil {
 			c.err = fmt.Errorf("could not parse file %s at revision %s: %s", file, rev, err)
-			return nil, nil
+			return nil, nil, nil
 		}
 
 		pkgName := src.Name.Name
@@ -113,9 +124,20 @@ func (c *Checker) parse(rev string) (*token.FileSet, revDecls) {
 			decls[pkgName] = make(map[string]ast.Decl)
 		}
 		decls[pkgName] = pkgDecls(src.Decls)
+
+		if typs[pkgName] == nil {
+			pkg := types.NewPackage("", pkgName)
+			info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue)}
+			typs[pkgName] = types.NewChecker(typConfig, fset, pkg, info)
+		}
+		err = typs[pkgName].Files([]*ast.File{src})
+		if err != nil {
+			c.err = fmt.Errorf("could not get types for file %s at revision %s: %s", file, rev, err)
+			return nil, nil, nil
+		}
 	}
 
-	return fset, decls
+	return fset, decls, typs
 }
 
 func pkgDecls(astDecls []ast.Decl) map[string]ast.Decl {
