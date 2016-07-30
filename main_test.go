@@ -36,10 +36,8 @@ func TestParse(t *testing.T) {
 
 	// Save results to buffer for comparison with gold master
 	var buf bytes.Buffer
-	for _, pkgChanges := range changes {
-		for _, change := range pkgChanges {
-			fmt.Fprint(&buf, change)
-		}
+	for _, change := range changes {
+		fmt.Fprint(&buf, change)
 	}
 
 	// Overwrite the gold master with go test -args update

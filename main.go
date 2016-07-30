@@ -19,8 +19,8 @@ type Checker struct {
 	aName  string
 	bFset  *token.FileSet
 	aFset  *token.FileSet
-	bDecls map[string]decls
-	aDecls map[string]decls
+	bDecls revDecls
+	aDecls revDecls
 	err    error
 
 	parseTime time.Duration
@@ -37,7 +37,7 @@ func New(before, after string) *Checker {
 	}
 }
 
-func (c *Checker) Check() (map[string][]Change, error) {
+func (c *Checker) Check() ([]Change, error) {
 	var wg sync.WaitGroup
 
 	// Parse revisions from VCS into go/ast
@@ -63,39 +63,27 @@ func (c *Checker) Check() (map[string][]Change, error) {
 		return nil, c.err
 	}
 
-	var (
-		changes = make(map[string][]Change)
-		err     error
-	)
-	for pkgName, bDecls := range c.bDecls {
-		aDecls, ok := c.aDecls[pkgName]
-		if !ok {
-			continue
+	start = time.Now()
+	err, changes := compareRevs(c.bDecls, c.aDecls)
+	if err != nil {
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "error processing diff: %s", err)
+		if derr, ok := err.(*diffError); ok {
+			ast.Fprint(&buf, c.bFset, derr.bdecl, ast.NotNilFilter)
+			ast.Fprint(&buf, c.aFset, derr.adecl, ast.NotNilFilter)
 		}
-
-		start = time.Now()
-		err, changes[pkgName] = diff(bDecls, aDecls)
-		if err != nil {
-			var buf bytes.Buffer
-			fmt.Fprintf(&buf, "error processing package %s: %s", pkgName, err)
-			if derr, ok := err.(*diffError); ok {
-				ast.Fprint(&buf, c.bFset, derr.bdecl, ast.NotNilFilter)
-				ast.Fprint(&buf, c.aFset, derr.adecl, ast.NotNilFilter)
-			}
-			err = errors.New(buf.String())
-			break
-		}
-		c.diffTime += time.Since(start)
-
-		start = time.Now()
-		sort.Sort(byID(changes[pkgName]))
-		c.sortTime += time.Since(start)
+		return nil, errors.New(buf.String())
 	}
+	c.diffTime += time.Since(start)
+
+	start = time.Now()
+	sort.Sort(byID(changes))
+	c.sortTime += time.Since(start)
 
 	return changes, nil
 }
 
-func (c *Checker) parse(rev string) (*token.FileSet, map[string]decls) {
+func (c *Checker) parse(rev string) (*token.FileSet, revDecls) {
 	files, err := c.vcs.ReadDir(rev, "")
 	if err != nil {
 		c.err = err
@@ -103,7 +91,7 @@ func (c *Checker) parse(rev string) (*token.FileSet, map[string]decls) {
 	}
 
 	fset := token.NewFileSet()
-	decls := make(map[string]decls) // package to id to decls
+	decls := make(map[string]map[string]ast.Decl) // package to id to decls
 	// TODO is there a concurrency opportunity here?
 	for _, file := range files {
 		contents, err := c.vcs.ReadFile(rev, file)
@@ -120,19 +108,16 @@ func (c *Checker) parse(rev string) (*token.FileSet, map[string]decls) {
 		}
 
 		pkgName := src.Name.Name
-
 		if decls[pkgName] == nil {
 			decls[pkgName] = make(map[string]ast.Decl)
 		}
-		for id, decl := range getDecls(src.Decls) {
-			decls[pkgName][id] = decl
-		}
+		decls[pkgName] = pkgDecls(src.Decls)
 	}
 
 	return fset, decls
 }
 
-func getDecls(astDecls []ast.Decl) decls {
+func pkgDecls(astDecls []ast.Decl) map[string]ast.Decl {
 	decls := make(map[string]ast.Decl)
 	for _, astDecl := range astDecls {
 		switch d := astDecl.(type) {

@@ -58,6 +58,7 @@ func (op OpType) String() string {
 
 // change is the ast declaration containing the before and after
 type Change struct {
+	Pkg     string
 	ID      string
 	Summary string
 	Op      OpType
@@ -95,9 +96,9 @@ func (a byID) Len() int           { return len(a) }
 func (a byID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byID) Less(i, j int) bool { return a[i].ID < a[j].ID }
 
-// decls is a map of an identifier to actual ast, where the id is a unique
-// name to match declarations for before and after
-type decls map[string]ast.Decl
+// revDecls is a map between a package to an id to ast.Decl, where the id is
+// a unique name to match declarations for before and after
+type revDecls map[string]map[string]ast.Decl
 
 type diffError struct {
 	summary string
@@ -111,41 +112,50 @@ func (e diffError) Error() string {
 	return e.summary
 }
 
-func diff(bdecls, adecls decls) (error, []Change) {
+func compareRevs(bRevDecls, aRevDecls revDecls) (error, []Change) {
 	var changes []Change
-	for id, decl := range bdecls {
-		if _, ok := adecls[id]; !ok {
-			// in before, not in after, therefore it was removed
-			changes = append(changes, Change{ID: id, Op: OpRemove, Before: decl})
+
+	for pkg, bDecls := range bRevDecls {
+		aDecls, ok := aRevDecls[pkg]
+		if !ok {
 			continue
 		}
 
-		// in before and in after, check if there's a difference
-		changeType, summary := compareDecl(bdecls[id], adecls[id])
+		for id, bDecl := range bDecls {
+			aDecl, ok := aDecls[id]
+			if !ok {
+				// in before, not in after, therefore it was removed
+				changes = append(changes, Change{Pkg: pkg, ID: id, Op: OpRemove, Before: bDecl})
+				continue
+			}
 
-		switch changeType {
-		case ChangNone, ChangeUnknown:
-			continue
-		case ChangeError:
-			err := &diffError{summary: summary, bdecl: bdecls[id], adecl: adecls[id]}
-			//err := &diffError{summary: summary, bpos: bdecls[id].Pos(), apos: adecls[id].Pos()}
-			return err, changes
+			// in before and in after, check if there's a difference
+			changeType, summary := compareDecl(bDecl, aDecl)
+
+			switch changeType {
+			case ChangNone, ChangeUnknown:
+				continue
+			case ChangeError:
+				err := &diffError{summary: summary, bdecl: bDecl, adecl: aDecl}
+				return err, changes
+			}
+
+			changes = append(changes, Change{
+				Pkg:     pkg,
+				ID:      id,
+				Op:      OpChange,
+				Change:  changeType,
+				Summary: summary,
+				Before:  bDecl,
+				After:   aDecl,
+			})
 		}
 
-		changes = append(changes, Change{
-			ID:      id,
-			Op:      OpChange,
-			Change:  changeType,
-			Summary: summary,
-			Before:  decl,
-			After:   adecls[id]},
-		)
-	}
-
-	for id, decl := range adecls {
-		if _, ok := bdecls[id]; !ok {
-			// in after, not in before, therefore it was added
-			changes = append(changes, Change{ID: id, Op: OpAdd, After: decl})
+		for id, aDecl := range aDecls {
+			if _, ok := bDecls[id]; !ok {
+				// in after, not in before, therefore it was added
+				changes = append(changes, Change{Pkg: pkg, ID: id, Op: OpAdd, After: aDecl})
+			}
 		}
 	}
 

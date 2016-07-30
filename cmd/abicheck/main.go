@@ -18,10 +18,8 @@ func main() {
 		panic(err)
 	}
 
-	for _, pkgChanges := range changes {
-		for _, change := range pkgChanges {
-			fmt.Println(change)
-		}
+	for _, change := range changes {
+		fmt.Println(change)
 	}
 
 	parseTime, diffTime, sortTime := checker.Timing()
