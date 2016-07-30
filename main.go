@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"sort"
 	"sync"
@@ -64,7 +65,7 @@ func (c *Checker) Check() ([]Change, error) {
 	}
 
 	start = time.Now()
-	err, changes := compareRevs(c.bDecls, c.aDecls)
+	changes, err := c.compareDecls()
 	if err != nil {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "error processing diff: %s", err)
@@ -181,4 +182,157 @@ func pkgDecls(astDecls []ast.Decl) map[string]ast.Decl {
 // Timing returns individual phase timing information
 func (c Checker) Timing() (parseTime, diffTime, sortTime time.Duration) {
 	return c.parseTime, c.diffTime, c.sortTime
+}
+
+type ChangeType uint8
+
+const (
+	ChangeError ChangeType = iota
+	ChangeUnknown
+	ChangeNone
+	ChangeNonBreaking
+	ChangeBreaking
+)
+
+func (c ChangeType) String() string {
+	switch c {
+	case ChangeError:
+		return "parse error"
+	case ChangeUnknown:
+		return "unknowable"
+	case ChangeNone:
+		return "no change"
+	case ChangeNonBreaking:
+		return "non-breaking change"
+	case ChangeBreaking:
+		return "breaking change"
+	}
+	panic(fmt.Sprintf("unknown ChangeType: %d", c))
+}
+
+type OpType uint8
+
+const (
+	OpAdd OpType = iota
+	OpRemove
+	OpChange
+)
+
+func (op OpType) String() string {
+	switch op {
+	case OpAdd:
+		return "added"
+	case OpRemove:
+		return "removed"
+	case OpChange:
+		return "changed"
+	}
+	panic(fmt.Sprintf("unknown operation type: %d", op))
+}
+
+// change is the ast declaration containing the before and after
+type Change struct {
+	Pkg     string
+	ID      string
+	Summary string
+	Op      OpType
+	Change  ChangeType
+	Before  ast.Decl
+	After   ast.Decl
+}
+
+func (c Change) String() string {
+	fset := token.FileSet{} // only require non-nil fset
+	pcfg := printer.Config{Mode: printer.RawFormat, Indent: 1}
+	buf := bytes.Buffer{}
+
+	if c.Op == OpChange {
+		fmt.Fprintf(&buf, "%s (%s - %s)\n", c.Op, c.Change, c.Summary)
+	} else {
+		fmt.Fprintln(&buf, c.Op)
+	}
+
+	if c.Before != nil {
+		pcfg.Fprint(&buf, &fset, c.Before)
+		fmt.Fprintln(&buf)
+	}
+	if c.After != nil {
+		pcfg.Fprint(&buf, &fset, c.After)
+		fmt.Fprintln(&buf)
+	}
+	return buf.String()
+}
+
+// byID implements sort.Interface for []change based on the id field
+type byID []Change
+
+func (a byID) Len() int           { return len(a) }
+func (a byID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byID) Less(i, j int) bool { return a[i].ID < a[j].ID }
+
+// revDecls is a map between a package to an id to ast.Decl, where the id is
+// a unique name to match declarations for before and after
+type revDecls map[string]map[string]ast.Decl
+
+type diffError struct {
+	summary string
+	bdecl,
+	adecl ast.Decl
+	bpos,
+	apos token.Pos
+}
+
+func (e diffError) Error() string {
+	return e.summary
+}
+
+// compareDecls compares a Checker's before and after declarations and returns
+// all changes or nil and an error
+func (c Checker) compareDecls() ([]Change, error) {
+	var changes []Change
+
+	for pkg, bDecls := range c.bDecls {
+		aDecls, ok := c.aDecls[pkg]
+		if !ok {
+			continue
+		}
+
+		for id, bDecl := range bDecls {
+			aDecl, ok := aDecls[id]
+			if !ok {
+				// in before, not in after, therefore it was removed
+				changes = append(changes, Change{Pkg: pkg, ID: id, Op: OpRemove, Before: bDecl})
+				continue
+			}
+
+			// in before and in after, check if there's a difference
+			changeType, summary := compareDecl(bDecl, aDecl)
+
+			switch changeType {
+			case ChangeNone, ChangeUnknown:
+				continue
+			case ChangeError:
+				return nil, &diffError{summary: summary, bdecl: bDecl, adecl: aDecl}
+			}
+
+			changes = append(changes, Change{
+				Pkg:     pkg,
+				ID:      id,
+				Op:      OpChange,
+				Change:  changeType,
+				Summary: summary,
+				Before:  bDecl,
+				After:   aDecl,
+			})
+		}
+
+		for id, aDecl := range aDecls {
+			if _, ok := bDecls[id]; !ok {
+				// in after, not in before, therefore it was added
+				changes = append(changes, Change{Pkg: pkg, ID: id, Op: OpAdd, After: aDecl})
+			}
+		}
+	}
+
+	return changes, nil
 }
