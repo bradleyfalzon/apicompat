@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// Checker is used to check for changes between two versions of a package.
 type Checker struct {
 	vcs    vcs
 	bName  string
@@ -27,6 +28,7 @@ type Checker struct {
 	sortTime  time.Duration
 }
 
+// TODO New returns a Checker with
 func New(before, after string) *Checker {
 	return &Checker{
 		vcs:   git{}, // TODO make checker auto discover
@@ -35,7 +37,7 @@ func New(before, after string) *Checker {
 	}
 }
 
-func (c *Checker) Check() (map[string][]change, error) {
+func (c *Checker) Check() (map[string][]Change, error) {
 	var wg sync.WaitGroup
 
 	// Parse revisions from VCS into go/ast
@@ -62,7 +64,7 @@ func (c *Checker) Check() (map[string][]change, error) {
 	}
 
 	var (
-		changes = make(map[string][]change)
+		changes = make(map[string][]Change)
 		err     error
 	)
 	for pkgName, bDecls := range c.bDecls {

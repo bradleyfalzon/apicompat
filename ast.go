@@ -10,86 +10,90 @@ import (
 	"strconv"
 )
 
-type changeType uint8
+type ChangeType uint8
 
 const (
-	changeError changeType = iota
-	changeUnknown
-	changeNone
-	changeNonBreaking
-	changeBreaking
+	ChangeError ChangeType = iota
+	ChangeUnknown
+	ChangNone
+	ChangeNonBreaking
+	ChangeBreaking
 )
 
-func (c changeType) String() string {
+func (c ChangeType) String() string {
 	switch c {
-	case changeError:
+	case ChangeError:
 		return "parse error"
-	case changeUnknown:
+	case ChangeUnknown:
 		return "unknowable"
-	case changeNone:
+	case ChangNone:
 		return "no change"
-	case changeNonBreaking:
+	case ChangeNonBreaking:
 		return "non-breaking change"
+	case ChangeBreaking:
+		return "breaking change"
 	}
-	return "breaking change"
+	panic(fmt.Sprintf("unknown ChangeType: %d", c))
 }
 
-type operation uint8
+type OpType uint8
 
 const (
-	opAdd operation = iota
-	opRemove
-	opChange
+	OpAdd OpType = iota
+	OpRemove
+	OpChange
 )
 
-func (op operation) String() string {
+func (op OpType) String() string {
 	switch op {
-	case opAdd:
+	case OpAdd:
 		return "added"
-	case opRemove:
+	case OpRemove:
 		return "removed"
+	case OpChange:
+		return "changed"
 	}
-	return "changed"
+	panic(fmt.Sprintf("unknown operation type: %d", op))
 }
 
 // change is the ast declaration containing the before and after
-type change struct {
-	id         string
-	summary    string
-	op         operation
-	changeType changeType
-	before     ast.Decl
-	after      ast.Decl
+type Change struct {
+	ID      string
+	Summary string
+	Op      OpType
+	Change  ChangeType
+	Before  ast.Decl
+	After   ast.Decl
 }
 
-func (c change) String() string {
+func (c Change) String() string {
 	fset := token.FileSet{} // only require non-nil fset
 	pcfg := printer.Config{Mode: printer.RawFormat, Indent: 1}
 	buf := bytes.Buffer{}
 
-	if c.op == opChange {
-		fmt.Fprintf(&buf, "%s (%s - %s)\n", c.op, c.changeType, c.summary)
+	if c.Op == OpChange {
+		fmt.Fprintf(&buf, "%s (%s - %s)\n", c.Op, c.Change, c.Summary)
 	} else {
-		fmt.Fprintln(&buf, c.op)
+		fmt.Fprintln(&buf, c.Op)
 	}
 
-	if c.before != nil {
-		pcfg.Fprint(&buf, &fset, c.before)
+	if c.Before != nil {
+		pcfg.Fprint(&buf, &fset, c.Before)
 		fmt.Fprintln(&buf)
 	}
-	if c.after != nil {
-		pcfg.Fprint(&buf, &fset, c.after)
+	if c.After != nil {
+		pcfg.Fprint(&buf, &fset, c.After)
 		fmt.Fprintln(&buf)
 	}
 	return buf.String()
 }
 
 // byID implements sort.Interface for []change based on the id field
-type byID []change
+type byID []Change
 
 func (a byID) Len() int           { return len(a) }
 func (a byID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byID) Less(i, j int) bool { return a[i].id < a[j].id }
+func (a byID) Less(i, j int) bool { return a[i].ID < a[j].ID }
 
 // decls is a map of an identifier to actual ast, where the id is a unique
 // name to match declarations for before and after
@@ -107,12 +111,12 @@ func (e diffError) Error() string {
 	return e.summary
 }
 
-func diff(bdecls, adecls decls) (error, []change) {
-	var changes []change
+func diff(bdecls, adecls decls) (error, []Change) {
+	var changes []Change
 	for id, decl := range bdecls {
 		if _, ok := adecls[id]; !ok {
 			// in before, not in after, therefore it was removed
-			changes = append(changes, change{id: id, op: opRemove, before: decl})
+			changes = append(changes, Change{ID: id, Op: OpRemove, Before: decl})
 			continue
 		}
 
@@ -120,28 +124,28 @@ func diff(bdecls, adecls decls) (error, []change) {
 		changeType, summary := compareDecl(bdecls[id], adecls[id])
 
 		switch changeType {
-		case changeNone, changeUnknown:
+		case ChangNone, ChangeUnknown:
 			continue
-		case changeError:
+		case ChangeError:
 			err := &diffError{summary: summary, bdecl: bdecls[id], adecl: adecls[id]}
 			//err := &diffError{summary: summary, bpos: bdecls[id].Pos(), apos: adecls[id].Pos()}
 			return err, changes
 		}
 
-		changes = append(changes, change{
-			id:         id,
-			op:         opChange,
-			changeType: changeType,
-			summary:    summary,
-			before:     decl,
-			after:      adecls[id]},
+		changes = append(changes, Change{
+			ID:      id,
+			Op:      OpChange,
+			Change:  changeType,
+			Summary: summary,
+			Before:  decl,
+			After:   adecls[id]},
 		)
 	}
 
 	for id, decl := range adecls {
 		if _, ok := bdecls[id]; !ok {
 			// in after, not in before, therefore it was added
-			changes = append(changes, change{id: id, op: opAdd, after: decl})
+			changes = append(changes, Change{ID: id, Op: OpAdd, After: decl})
 		}
 	}
 
@@ -151,12 +155,12 @@ func diff(bdecls, adecls decls) (error, []change) {
 // equal compares two declarations and returns true if they do not have
 // incompatible changes. For example, comments aren't compared, names of
 // arguments aren't compared etc.
-func compareDecl(before, after ast.Decl) (changeType, string) {
+func compareDecl(before, after ast.Decl) (ChangeType, string) {
 	// compare types, ignore comments etc, so reflect.DeepEqual isn't good enough
 
 	if reflect.TypeOf(before) != reflect.TypeOf(after) {
 		// Declaration type changed, such as GenDecl to FuncDecl (eg var/const to func)
-		return changeBreaking, "changed declaration"
+		return ChangeBreaking, "changed declaration"
 	}
 
 	switch b := before.(type) {
@@ -167,7 +171,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 
 		if reflect.TypeOf(b.Specs[0]) != reflect.TypeOf(a.Specs[0]) {
 			// Spec changed, such as ValueSpec to TypeSpec (eg var/const to struct)
-			return changeBreaking, "changed spec"
+			return ChangeBreaking, "changed spec"
 		}
 
 		switch bspec := b.Specs[0].(type) {
@@ -177,7 +181,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 			if bspec.Type == nil || aspec.Type == nil {
 				// eg: var ErrSomeError = errors.New("Some Error")
 				// cannot currently determine the type
-				return changeUnknown, "cannot currently determine type"
+				return ChangeUnknown, "cannot currently determine type"
 			}
 
 			// TODO perhaps just make this entire thing use
@@ -185,7 +189,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 
 			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
 				// eg change from int to []int
-				return changeBreaking, "changed value spec type"
+				return ChangeBreaking, "changed value spec type"
 			}
 
 			// var / const
@@ -194,7 +198,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				// int/string/etc or bytes.Buffer/etc or *int/*bytes.Buffer/etc
 				if !exprEqual(bspec.Type, aspec.Type) {
 					// type changed
-					return changeBreaking, "changed type"
+					return ChangeBreaking, "changed type"
 				}
 			case *ast.ArrayType:
 				// slice/array
@@ -202,21 +206,21 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				// compare length
 				if !exprEqual(btype.Len, atype.Len) {
 					// change of length, or between array and slice
-					return changeBreaking, "changed of array's length"
+					return ChangeBreaking, "changed of array's length"
 				}
 				// compare array's element's type
 				if !exprEqual(btype.Elt, atype.Elt) {
-					return changeBreaking, "changed of array's element's type"
+					return ChangeBreaking, "changed of array's element's type"
 				}
 			case *ast.MapType:
 				// map
 				atype := aspec.Type.(*ast.MapType)
 
 				if !exprEqual(btype.Key, atype.Key) {
-					return changeBreaking, "changed map's key's type"
+					return ChangeBreaking, "changed map's key's type"
 				}
 				if !exprEqual(btype.Value, atype.Value) {
-					return changeBreaking, "changed map's value's type"
+					return ChangeBreaking, "changed map's value's type"
 				}
 			case *ast.InterfaceType:
 				// this is a special case for just interface{}
@@ -235,7 +239,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				atype := aspec.Type.(*ast.StructType)
 				return compareStructType(btype, atype)
 			default:
-				return changeError, fmt.Sprintf("Unknown val spec type: %T, source: %s", btype, typeToString(before))
+				return ChangeError, fmt.Sprintf("Unknown val spec type: %T, source: %s", btype, typeToString(before))
 			}
 		case *ast.TypeSpec:
 			aspec := a.Specs[0].(*ast.TypeSpec)
@@ -244,7 +248,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 
 			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
 				// Spec change, such as from StructType to InterfaceType or different aliased types
-				return changeBreaking, "changed type of value spec"
+				return ChangeBreaking, "changed type of value spec"
 			}
 
 			switch btype := bspec.Type.(type) {
@@ -259,7 +263,7 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 				atype := aspec.Type.(*ast.Ident)
 				if btype.Name != atype.Name {
 					// Alias typing changed underlying types
-					return changeBreaking, "alias changed its underlying type"
+					return ChangeBreaking, "alias changed its underlying type"
 				}
 			}
 		}
@@ -267,70 +271,70 @@ func compareDecl(before, after ast.Decl) (changeType, string) {
 		a := after.(*ast.FuncDecl)
 		return compareFuncType(b.Type, a.Type)
 	default:
-		return changeError, fmt.Sprintf("Unknown declaration type: %T, source: %s", before, typeToString(before))
+		return ChangeError, fmt.Sprintf("Unknown declaration type: %T, source: %s", before, typeToString(before))
 	}
-	return changeNone, ""
+	return ChangNone, ""
 }
 
-func compareChanType(before, after *ast.ChanType) (changeType, string) {
+func compareChanType(before, after *ast.ChanType) (ChangeType, string) {
 	if !exprEqual(before.Value, after.Value) {
-		return changeBreaking, "changed channel's type"
+		return ChangeBreaking, "changed channel's type"
 	}
 
 	// If we're specifying a direction and it's not the same as before
 	// (if we remove direction then that change isn't breaking)
 	if before.Dir != after.Dir {
 		if after.Dir != ast.SEND && after.Dir != ast.RECV {
-			return changeNonBreaking, "removed channel's direction"
+			return ChangeNonBreaking, "removed channel's direction"
 		}
-		return changeBreaking, "changed channel's direction"
+		return ChangeBreaking, "changed channel's direction"
 	}
-	return changeNone, ""
+	return ChangNone, ""
 }
 
-func compareInterfaceType(before, after *ast.InterfaceType) (changeType, string) {
+func compareInterfaceType(before, after *ast.InterfaceType) (ChangeType, string) {
 	// interfaces don't care if methods are removed
 	added, removed, changed := diffFields(before.Methods.List, after.Methods.List)
 	if len(added) > 0 {
 		// Fields were added
-		return changeBreaking, "members added"
+		return ChangeBreaking, "members added"
 	} else if len(changed) > 0 {
 		// Fields changed types
-		return changeBreaking, "members changed types"
+		return ChangeBreaking, "members changed types"
 	} else if len(removed) > 0 {
-		return changeNonBreaking, "members removed"
+		return ChangeNonBreaking, "members removed"
 	}
 
-	return changeNone, ""
+	return ChangNone, ""
 }
-func compareStructType(before, after *ast.StructType) (changeType, string) {
+func compareStructType(before, after *ast.StructType) (ChangeType, string) {
 	// structs don't care if fields were added
 	added, removed, changed := diffFields(before.Fields.List, after.Fields.List)
 	if len(removed) > 0 {
 		// Fields were removed
-		return changeBreaking, "members removed"
+		return ChangeBreaking, "members removed"
 	} else if len(changed) > 0 {
 		// Fields changed types
-		return changeBreaking, "members changed types"
+		return ChangeBreaking, "members changed types"
 	} else if len(added) > 0 {
-		return changeNonBreaking, "members added"
+		return ChangeNonBreaking, "members added"
 	}
-	return changeNone, ""
+	return ChangNone, ""
 }
-func compareFuncType(before, after *ast.FuncType) (changeType, string) {
+func compareFuncType(before, after *ast.FuncType) (ChangeType, string) {
 	// don't compare argument names
 	bparams := stripNames(before.Params.List)
 	aparams := stripNames(after.Params.List)
 
 	added, removed, changed := diffFields(bparams, aparams)
 	if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
-		return changeBreaking, "parameters types changed"
+		return ChangeBreaking, "parameters types changed"
 	}
 
 	if before.Results != nil {
 		if after.Results == nil {
 			// removed return parameter
-			return changeBreaking, "removed return parameter"
+			return ChangeBreaking, "removed return parameter"
 		}
 
 		// don't compare argument names
@@ -342,12 +346,12 @@ func compareFuncType(before, after *ast.FuncType) (changeType, string) {
 		if len(before.Results.List) > 0 {
 			added, removed, changed := diffFields(bresults, aresults)
 			if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
-				return changeBreaking, "return parameters changed"
+				return ChangeBreaking, "return parameters changed"
 			}
 		}
 	}
 
-	return changeNone, ""
+	return ChangNone, ""
 }
 
 // stripNames strips the names from a fieldlist, which is usually a function's
@@ -418,7 +422,7 @@ func exprEqual(before, after ast.Expr) bool {
 	case *ast.ChanType:
 		atype := after.(*ast.ChanType)
 		change, _ := compareChanType(btype, atype)
-		return change != changeBreaking
+		return change != ChangeBreaking
 	}
 
 	// For the moment just use typeToString and compare strings
