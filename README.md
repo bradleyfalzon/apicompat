@@ -40,13 +40,13 @@ abicheck
 
 # Testing
 
-This uses golden masters for the tests, currently (and only due to time constraints) `testdata/` directory contains `a.go`
-and `b.go`, which are before and after versions of a test package, each time `go test` is ran, the output is compared to
+This uses golden masters for the tests, currently (and only due to time constraints) `testdata/` directory contains `before.go`
+and `after.go`, which are before and after versions of a test package, each time `go test` is ran, the output is compared to
 `testdata/exp.txt`, which should not change.
 
 If adding new test cases, you should expect the test to fail as the code changes should create a difference with `exp.txt`.
-Then, you'll need to update the golden master (see below), and commit those changes. If you add a new test case to `a.go` and
-`b.go`, and the tests still pass, you've uncovered a bug within `abicheck` which will need a code change to fix, once
+Then, you'll need to update the golden master (see below), and commit those changes. If you add a new test case to `before.go` and
+`after.go`, and the tests still pass, you've uncovered a bug within `abicheck` which will need a code change to fix, once
 code has change, the tests should fail, so update the master, review all your changes and commit.
 
 - This uses golden master `testdata/exp.txt` for the tests

@@ -17,11 +17,11 @@ git config --local user.name "testgit"
 git config --local user.email "testgit@example.com"
 
 # Initial commit
-cp ../testdata/a.go testdata.go
+cp ../testdata/before.go testdata.go
 git add testdata.go
 git commit -m '1st commit'
 
 # Second commit
-cat ../testdata/b.go > testdata.go
+cat ../testdata/after.go > testdata.go
 git add testdata.go
 git commit -m '2nd commit'

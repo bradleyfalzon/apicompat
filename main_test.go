@@ -13,12 +13,12 @@ import (
 func TestParse(t *testing.T) {
 	vcs := strvcs{}
 
-	rev1, err := ioutil.ReadFile("testdata/a.go")
+	rev1, err := ioutil.ReadFile("testdata/before.go")
 	if err != nil {
 		t.Fatal("cannot load test data for rev1:", err)
 	}
 
-	rev2, err := ioutil.ReadFile("testdata/b.go")
+	rev2, err := ioutil.ReadFile("testdata/after.go")
 	if err != nil {
 		t.Fatal("cannot load test data for rev2:", err)
 	}
