@@ -1,11 +1,12 @@
 package abicheck
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"sort"
 	"sync"
 	"time"
@@ -13,103 +14,107 @@ import (
 
 type Checker struct {
 	vcs    vcs
-	oldRev string
-	newRev string
+	bName  string
+	aName  string
+	bFset  *token.FileSet
+	aFset  *token.FileSet
+	bDecls map[string]decls
+	aDecls map[string]decls
+	err    error
+
+	parseTime time.Duration
+	diffTime  time.Duration
+	sortTime  time.Duration
 }
 
-func New(oldRev, newRev string) *Checker {
+func New(before, after string) *Checker {
 	return &Checker{
-		vcs:    git{}, // TODO make checker auto discover
-		oldRev: oldRev,
-		newRev: newRev,
+		vcs:   git{}, // TODO make checker auto discover
+		bName: before,
+		aName: after,
 	}
 }
 
-func (c *Checker) Check() {
-	var (
-		err      error
-		wg       sync.WaitGroup
-		newFset  *token.FileSet
-		oldFset  *token.FileSet
-		newDecls map[string]decls
-		oldDecls map[string]decls
+func (c *Checker) Check() (map[string][]change, error) {
+	var wg sync.WaitGroup
 
-		parseTime time.Duration
-		diffTime  time.Duration
-		sortTime  time.Duration
-	)
-
-	// TODO continue to refactor to be more library friendly (no printing, no exit etc).
+	// Parse revisions from VCS into go/ast
 
 	start := time.Now()
 	wg.Add(1)
 	go func() {
-		oldFset, oldDecls, err = parse(c.vcs, c.oldRev)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", c.oldRev, err.Error())
-			os.Exit(1)
-		}
+		c.bFset, c.bDecls = c.parse(c.bName)
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		newFset, newDecls, err = parse(c.vcs, c.newRev)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %s\n", c.newRev, err.Error())
-			os.Exit(1)
-		}
+		c.aFset, c.aDecls = c.parse(c.aName)
 		wg.Done()
 	}()
 
 	wg.Wait()
-	parseTime = time.Since(start)
+	c.parseTime = time.Since(start)
 
-	for pkgName, decls := range oldDecls {
-		if _, ok := newDecls[pkgName]; ok {
-			start = time.Now()
-			err, changes := diff(decls, newDecls[pkgName])
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				if derr, ok := err.(*diffError); ok {
-					ast.Fprint(os.Stderr, oldFset, derr.bdecl, ast.NotNilFilter)
-					ast.Fprint(os.Stderr, newFset, derr.adecl, ast.NotNilFilter)
-				}
-				return
-			}
-			diffTime += time.Since(start)
-
-			start = time.Now()
-			sort.Sort(byID(changes))
-			for _, change := range changes {
-				fmt.Println(change)
-			}
-			sortTime += time.Since(start)
-		}
+	if c.err != nil {
+		// Error parsing, don't continue
+		return nil, c.err
 	}
 
-	fmt.Printf("Parse time: %v, Diff time: %v, Sort time: %v", parseTime, diffTime, sortTime)
+	var (
+		changes = make(map[string][]change)
+		err     error
+	)
+	for pkgName, bDecls := range c.bDecls {
+		aDecls, ok := c.aDecls[pkgName]
+		if !ok {
+			continue
+		}
+
+		start = time.Now()
+		err, changes[pkgName] = diff(bDecls, aDecls)
+		if err != nil {
+			var buf bytes.Buffer
+			fmt.Fprintf(&buf, "error processing package %s: %s", pkgName, err)
+			if derr, ok := err.(*diffError); ok {
+				ast.Fprint(&buf, c.bFset, derr.bdecl, ast.NotNilFilter)
+				ast.Fprint(&buf, c.aFset, derr.adecl, ast.NotNilFilter)
+			}
+			err = errors.New(buf.String())
+			break
+		}
+		c.diffTime += time.Since(start)
+
+		start = time.Now()
+		sort.Sort(byID(changes[pkgName]))
+		c.sortTime += time.Since(start)
+	}
+
+	return changes, nil
 }
 
-func parse(vcs vcs, rev string) (*token.FileSet, map[string]decls, error) {
-	files, err := vcs.ReadDir(rev, "")
+func (c *Checker) parse(rev string) (*token.FileSet, map[string]decls) {
+	files, err := c.vcs.ReadDir(rev, "")
 	if err != nil {
-		return nil, nil, err
+		c.err = err
+		return nil, nil
 	}
 
 	fset := token.NewFileSet()
 	decls := make(map[string]decls) // package to id to decls
 	// TODO is there a concurrency opportunity here?
 	for _, file := range files {
-		contents, err := vcs.ReadFile(rev, file)
+		contents, err := c.vcs.ReadFile(rev, file)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not read file %s at revision %s: %s", file, rev, err)
+			c.err = fmt.Errorf("could not read file %s at revision %s: %s", file, rev, err)
+			return nil, nil
 		}
 
 		filename := rev + ":" + file
 		src, err := parser.ParseFile(fset, filename, contents, 0)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not parse file %s at revision %s: %s", file, rev, err)
+			c.err = fmt.Errorf("could not parse file %s at revision %s: %s", file, rev, err)
+			return nil, nil
 		}
 
 		pkgName := src.Name.Name
@@ -122,7 +127,7 @@ func parse(vcs vcs, rev string) (*token.FileSet, map[string]decls, error) {
 		}
 	}
 
-	return fset, decls, nil
+	return fset, decls
 }
 
 func getDecls(astDecls []ast.Decl) decls {
@@ -184,4 +189,9 @@ func getDecls(astDecls []ast.Decl) decls {
 		}
 	}
 	return decls
+}
+
+// Timing returns individual phase timing information
+func (c Checker) Timing() (parseTime, diffTime, sortTime time.Duration) {
+	return c.parseTime, c.diffTime, c.sortTime
 }

@@ -1,6 +1,10 @@
 package main
 
-import "github.com/bradleyfalzon/abicheck"
+import (
+	"fmt"
+
+	"github.com/bradleyfalzon/abicheck"
+)
 
 func main() {
 	const (
@@ -9,5 +13,17 @@ func main() {
 	)
 
 	checker := abicheck.New(oldRev, newRev)
-	checker.Check()
+	changes, err := checker.Check()
+	if err != nil {
+		panic(err)
+	}
+
+	for _, pkgChanges := range changes {
+		for _, change := range pkgChanges {
+			fmt.Println(change)
+		}
+	}
+
+	parseTime, diffTime, sortTime := checker.Timing()
+	fmt.Printf("Parse time: %v, Diff time: %v, Sort time: %v", parseTime, diffTime, sortTime)
 }

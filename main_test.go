@@ -6,56 +6,58 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
-	"sort"
 	"testing"
 )
 
 func TestParse(t *testing.T) {
+	// Create strvcs and fill it with test data
 	vcs := strvcs{}
 
 	rev1, err := ioutil.ReadFile("testdata/before.go")
 	if err != nil {
 		t.Fatal("cannot load test data for rev1:", err)
 	}
+	vcs.SetFile("rev1", "abitest.go", rev1)
 
 	rev2, err := ioutil.ReadFile("testdata/after.go")
 	if err != nil {
 		t.Fatal("cannot load test data for rev2:", err)
 	}
-
-	vcs.SetFile("rev1", "abitest.go", rev1)
 	vcs.SetFile("rev2", "abitest.go", rev2)
 
-	_, oldDecls, err := parse(vcs, "rev1")
-	_, newDecls, err := parse(vcs, "rev2")
+	// Run checks
+	c := New("rev1", "rev2")
+	c.vcs = vcs
 
-	got := bytes.NewBufferString("")
-	for pkgName, decls := range oldDecls {
-		if _, ok := newDecls[pkgName]; ok {
-			err, changes := diff(decls, newDecls[pkgName])
-			if err != nil {
-				t.Fatal(err)
-			}
-			sort.Sort(byID(changes))
-			for _, change := range changes {
-				fmt.Fprint(got, change)
-			}
+	changes, err := c.Check()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Save results to buffer for comparison with gold master
+	var buf bytes.Buffer
+	for _, pkgChanges := range changes {
+		for _, change := range pkgChanges {
+			fmt.Fprint(&buf, change)
 		}
 	}
 
+	// Overwrite the gold master with go test -args update
 	if len(os.Args) > 1 && os.Args[1] == "update" {
-		err := ioutil.WriteFile("testdata/exp.txt", got.Bytes(), os.FileMode(0644))
+		err := ioutil.WriteFile("testdata/exp.txt", buf.Bytes(), os.FileMode(0644))
 		if err != nil {
 			t.Fatal("could not write exp data:", err)
 		}
 	}
 
+	// Load gold master
 	exp, err := ioutil.ReadFile("testdata/exp.txt")
 	if err != nil {
 		t.Fatal("cannot load expect data:", err)
 	}
 
-	if !reflect.DeepEqual(exp, got.Bytes()) {
-		t.Errorf("got:\n%v\nexp:\n%v\n", got, string(exp))
+	// Compare results gold master
+	if !reflect.DeepEqual(exp, buf.Bytes()) {
+		t.Errorf("got:\n%v\nexp:\n%v\n", buf, string(exp))
 	}
 }
