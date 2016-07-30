@@ -18,19 +18,41 @@ cd /your/project/dir/with/comitted/changes
 abicheck
 ```
 
+# Proposed Arguments
+
+`abicheck` also comes with a command line tool, as well as being used as a library, the following are the proposed flags
+and arguments for the command line tool.
+
+```
+-vcs (auto|git|svn|hg|bzr|etc)  - Version control system to use (default: auto)
+-rev FROM...TO                  - Revisions to check as before and after (default: if unstaged changes, check those, else check last two commits)
+-vcsDir path                    - Path to root VCS directory (default: let VCS tool search)
+-nonBreaking                    - Show non-breaking changes as well as breaking (default: false)
+
+abicheck        # current package only
+abicheck ./...  # check subdirectory packages
+```
+
+Another tool, called `abichanges` may also be included which will list all detected changes to assist in producing
+release notes.
+
 # Status
 
-`abicheck` is currently under heavy development and heavy refactoring. This initial version was a proof of concept and shortcuts were taken. The current work is focused on (but no limited to):
+`abicheck` is currently under heavy development and refactoring. This initial version was a proof of concept and shortcuts were taken. The current tasks are focused on (but not limited to):
 
-- Code clean up, such as removing custom types and making it library friendly
+- ~~Code clean up, such as removing custom types and making it library friendly~~
 - Add type checking to analyse inferred types
+- Choosing of import paths as the first argument, similar to other tools (no argument means just current directory, else
+    support `./...` and specifying)
 - Investigate additional interface checks (e.g., currently renaming an interface with the same methods would be detected as
     a breaking change, this isn't always true)
 - Adding Mercurial, SVN and potentially other VCS systems
 - Improve VCS options such as:
-    - Choosing the versions to compare
-    - Checking of unstaged changes (currently only checks committed changes)
-    - Filtering `vendor/` directories
+    - Detection of VCS and flag to overwrite
+    - Choosing base VCS path to allow running for a different directory
+    - Detecting if there's unstaged changes (currently only checks committed changes) and testing those
+    - Choosing the versions to compare (e.g. via flag `-rev HEAD~1...HEAD` or similar, staying VCS agnostic)
+    - Filtering `vendor/` directories (if this is the best place to do it, or leave it to go/type ast packages)
     - Check subdirectories if ran from a subdirectory of the VCS (currently checks all committed code)
 - Add docs, flow diagram and fixing of existing docs
 - Improve output formats, such as vim quickfix
