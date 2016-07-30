@@ -337,10 +337,13 @@ func compareFuncType(before, after *ast.FuncType) (changeType, string) {
 		bresults := stripNames(before.Results.List)
 		aresults := stripNames(after.Results.List)
 
-		_, removed, changed := diffFields(bresults, aresults)
-		// Only check if we're changing/removing return parameters
-		if len(removed) > 0 || len(changed) > 0 {
-			return changeBreaking, "changed or removed return parameter"
+		// Adding return parameters to a function, when it didn't have any before is
+		// ok, so only check if for breaking changes if there was parameters before
+		if len(before.Results.List) > 0 {
+			added, removed, changed := diffFields(bresults, aresults)
+			if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
+				return changeBreaking, "return parameters changed"
+			}
 		}
 	}
 

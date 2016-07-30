@@ -10,6 +10,9 @@ removed
 changed (breaking change - parameters types changed)
 	func FuncAddArg()
 	func FuncAddArg(arg1 int)
+changed (breaking change - return parameters changed)
+	func FuncAddRetMore() error
+	func FuncAddRetMore() (error, bool)
 changed (breaking change - parameters types changed)
 	func FuncChangeArg(arg1 int)
 	func FuncChangeArg(param uint)
@@ -19,13 +22,13 @@ changed (breaking change - parameters types changed)
 changed (breaking change - parameters types changed)
 	func FuncChangeChanDir(arg1 chan int)
 	func FuncChangeChanDir(arg1 <-chan int)
-changed (breaking change - changed or removed return parameter)
+changed (breaking change - return parameters changed)
 	func FuncChangeRet() error
 	func FuncChangeRet() bool
-changed (breaking change - changed or removed return parameter)
+changed (breaking change - return parameters changed)
 	func FuncChangeRetStarIdent() *int
 	func FuncChangeRetStarIdent() *uint
-changed (breaking change - changed or removed return parameter)
+changed (breaking change - return parameters changed)
 	func FuncChangeRetStarSelector() *bytes.Buffer
 	func FuncChangeRetStarSelector() *bytes.Reader
 changed (breaking change - parameters types changed)
@@ -109,7 +112,7 @@ changed (non-breaking change - removed channel's direction)
 changed (breaking change - parameters types changed)
 	var VarChangeTypeFuncParam func(int) error
 	var VarChangeTypeFuncParam func(uint) error
-changed (breaking change - changed or removed return parameter)
+changed (breaking change - return parameters changed)
 	var VarChangeTypeFuncResult func(int) error
 	var VarChangeTypeFuncResult func(int) bool
 changed (breaking change - changed map's key's type)
