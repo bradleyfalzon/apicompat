@@ -13,8 +13,6 @@ import (
 	"sort"
 	"sync"
 	"time"
-
-	"github.com/bradleyfalzon/abicheck/abicompat"
 )
 
 // Checker is used to check for changes between two versions of a package.
@@ -230,13 +228,13 @@ func (op OpType) String() string {
 
 // change is the ast declaration containing the before and after
 type Change struct {
-	Pkg    string
-	ID     string
-	Msg    string
-	Op     OpType
-	Change string
-	Before ast.Decl
-	After  ast.Decl
+	Pkg    string   // Pkg is the name of the package the change occurred in
+	ID     string   // ID is an identifier to match a declaration between versions
+	Msg    string   // Msg describes the change
+	Op     OpType   // Op is the type of operation, such added, removed, changed
+	Change string   // Change describes whether it was unknown, no change, non-breaking or breaking change
+	Before ast.Decl // Before is the previous declaration
+	After  ast.Decl // After is the new declaration
 }
 
 func (c Change) String() string {
@@ -295,7 +293,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 			continue
 		}
 
-		compat := abicompat.New(c.bTypes[pkg], c.aTypes[pkg])
+		d := NewDeclChecker(c.bTypes[pkg], c.aTypes[pkg])
 
 		for id, bDecl := range bDecls {
 			aDecl, ok := aDecls[id]
@@ -306,13 +304,13 @@ func (c Checker) compareDecls() ([]Change, error) {
 			}
 
 			// in before and in after, check if there's a difference
-			change, err := compat.Check(bDecl, aDecl)
+			change, err := d.Check(bDecl, aDecl)
 			if err != nil {
 				return nil, &diffError{err: err, bdecl: bDecl, adecl: aDecl}
 			}
 
 			switch change.Change {
-			case abicompat.None, abicompat.Unknown:
+			case None, Unknown:
 				continue
 			}
 

@@ -1,4 +1,4 @@
-package abicompat
+package abicheck
 
 import (
 	"fmt"
@@ -15,32 +15,32 @@ const (
 	Breaking    = "breaking change"
 )
 
-type Change struct {
+type DeclChange struct {
 	Change string
 	Msg    string
 }
 
-type Checker struct {
+type DeclChecker struct {
 	btypes *types.Checker
 	atypes *types.Checker
 }
 
-func New(btypes, atypes *types.Checker) *Checker {
-	return &Checker{
+func NewDeclChecker(btypes, atypes *types.Checker) *DeclChecker {
+	return &DeclChecker{
 		btypes: btypes,
 		atypes: atypes,
 	}
 }
 
-func nonBreaking(msg string) (*Change, error) { return &Change{Change: NonBreaking, Msg: msg}, nil }
-func breaking(msg string) (*Change, error)    { return &Change{Change: Breaking, Msg: msg}, nil }
-func unknown(msg string) (*Change, error)     { return &Change{Change: Unknown, Msg: msg}, nil }
-func none() (*Change, error)                  { return &Change{Change: None}, nil }
+func nonBreaking(msg string) (*DeclChange, error) { return &DeclChange{NonBreaking, msg}, nil }
+func breaking(msg string) (*DeclChange, error)    { return &DeclChange{Breaking, msg}, nil }
+func unknown(msg string) (*DeclChange, error)     { return &DeclChange{Unknown, msg}, nil }
+func none() (*DeclChange, error)                  { return &DeclChange{None, ""}, nil }
 
 // equal compares two declarations and returns true if they do not have
 // incompatible changes. For example, comments aren't compared, names of
 // arguments aren't compared etc.
-func (c Checker) Check(before, after ast.Decl) (*Change, error) {
+func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
 	// compare types, ignore comments etc, so reflect.DeepEqual isn't good enough
 
 	if reflect.TypeOf(before) != reflect.TypeOf(after) {
@@ -154,7 +154,7 @@ func (c Checker) Check(before, after ast.Decl) (*Change, error) {
 	return none()
 }
 
-func (c Checker) checkChan(before, after *ast.ChanType) (*Change, error) {
+func (c DeclChecker) checkChan(before, after *ast.ChanType) (*DeclChange, error) {
 	if !c.exprEqual(before.Value, after.Value) {
 		return breaking("changed channel's type")
 	}
@@ -170,7 +170,7 @@ func (c Checker) checkChan(before, after *ast.ChanType) (*Change, error) {
 	return none()
 }
 
-func (c Checker) checkInterface(before, after *ast.InterfaceType) (*Change, error) {
+func (c DeclChecker) checkInterface(before, after *ast.InterfaceType) (*DeclChange, error) {
 	// interfaces don't care if methods are removed
 	added, removed, changed := c.diffFields(before.Methods.List, after.Methods.List)
 	if len(added) > 0 {
@@ -186,7 +186,7 @@ func (c Checker) checkInterface(before, after *ast.InterfaceType) (*Change, erro
 	return none()
 }
 
-func (c Checker) checkStruct(before, after *ast.StructType) (*Change, error) {
+func (c DeclChecker) checkStruct(before, after *ast.StructType) (*DeclChange, error) {
 	// structs don't care if fields were added
 	added, removed, changed := c.diffFields(before.Fields.List, after.Fields.List)
 	if len(removed) > 0 {
@@ -201,7 +201,7 @@ func (c Checker) checkStruct(before, after *ast.StructType) (*Change, error) {
 	return none()
 }
 
-func (c Checker) checkFunc(before, after *ast.FuncType) (*Change, error) {
+func (c DeclChecker) checkFunc(before, after *ast.FuncType) (*DeclChange, error) {
 	// don't compare argument names
 	bparams := stripNames(before.Params.List)
 	aparams := stripNames(after.Params.List)
@@ -252,7 +252,7 @@ func stripNames(fields []*ast.Field) []*ast.Field {
 	return stripped
 }
 
-func (c Checker) diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Field) {
+func (c DeclChecker) diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Field) {
 	// Presort after for quicker matching of fieldname -> type, may not be worthwhile
 	AfterMembers := make(map[string]*ast.Field)
 	for i, field := range after {
@@ -294,7 +294,7 @@ func fieldKey(field *ast.Field, i int) string {
 }
 
 // exprEqual compares two ast.Expr to determine if they are equal
-func (c Checker) exprEqual(before, after ast.Expr) bool {
+func (c DeclChecker) exprEqual(before, after ast.Expr) bool {
 	if reflect.TypeOf(before) != reflect.TypeOf(after) {
 		return false
 	}
