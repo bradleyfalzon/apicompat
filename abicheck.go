@@ -17,7 +17,7 @@ import (
 
 // Checker is used to check for changes between two versions of a package.
 type Checker struct {
-	vcs    vcs
+	vcs    VCS
 	bName  string
 	aName  string
 	bFset  *token.FileSet
@@ -34,15 +34,25 @@ type Checker struct {
 }
 
 // TODO New returns a Checker with
-func New(before, after string) *Checker {
-	return &Checker{
-		vcs:   git{}, // TODO make checker auto discover
-		bName: before,
-		aName: after,
+func New(options ...func(*Checker)) *Checker {
+	c := &Checker{
+		vcs: Git{}, // TODO make checker auto discover
+	}
+
+	for _, option := range options {
+		option(c)
+	}
+	return c
+}
+
+func SetVCS(vcs VCS) func(*Checker) {
+	return func(c *Checker) {
+		c.vcs = vcs
 	}
 }
 
-func (c *Checker) Check() ([]Change, error) {
+func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
+
 	var wg sync.WaitGroup
 
 	// Parse revisions from VCS into go/ast
@@ -50,13 +60,13 @@ func (c *Checker) Check() ([]Change, error) {
 	start := time.Now()
 	wg.Add(1)
 	go func() {
-		c.bFset, c.bDecls, c.bTypes = c.parse(c.bName)
+		c.bFset, c.bDecls, c.bTypes = c.parse(beforeRev)
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		c.aFset, c.aDecls, c.aTypes = c.parse(c.aName)
+		c.aFset, c.aDecls, c.aTypes = c.parse(afterRev)
 		wg.Done()
 	}()
 

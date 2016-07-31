@@ -12,8 +12,8 @@ func main() {
 		newRev = "HEAD"
 	)
 
-	checker := abicheck.New(oldRev, newRev)
-	changes, err := checker.Check()
+	checker := abicheck.New()
+	changes, err := checker.Check(oldRev, newRev)
 	if err != nil {
 		panic(err)
 	}

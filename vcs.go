@@ -10,7 +10,7 @@ import (
 
 // vcs interface defines a version control system
 // the vcs should be able to handle calls to ReadFile concurrently
-type vcs interface {
+type VCS interface {
 	// ReadDir returns a list of files in a directory at revision recursively
 	// and returns only .go files
 	ReadDir(revision, path string) ([]string, error)
@@ -18,12 +18,12 @@ type vcs interface {
 	ReadFile(revision, filename string) ([]byte, error)
 }
 
-var _ vcs = (*git)(nil)
+var _ VCS = (*Git)(nil)
 
 // git implements vcs and uses exec.Command to access repository
-type git struct{}
+type Git struct{}
 
-func (git) ReadDir(revision, path string) ([]string, error) {
+func (Git) ReadDir(revision, path string) ([]string, error) {
 	// Add trailing slash if path is set and doesn't already contain one
 	if path != "" && !strings.HasSuffix(path, string(os.PathSeparator)) {
 		path += string(os.PathSeparator)
@@ -44,7 +44,7 @@ func (git) ReadDir(revision, path string) ([]string, error) {
 	return files, nil
 }
 
-func (git) ReadFile(revision, path string) ([]byte, error) {
+func (Git) ReadFile(revision, path string) ([]byte, error) {
 	args := []string{"show", revision + ":" + path}
 	contents, err := exec.Command("git", args...).Output()
 	if err != nil {
@@ -53,15 +53,15 @@ func (git) ReadFile(revision, path string) ([]byte, error) {
 	return contents, err
 }
 
-var _ vcs = (*strvcs)(nil)
+var _ VCS = (*StrVCS)(nil)
 
 // strvcs provides a in memory vcs used for testing
-type strvcs struct {
+type StrVCS struct {
 	files map[string]map[string][]byte // revision -> path -> contents
 }
 
 // SetFile contents for a particular revision and path
-func (v *strvcs) SetFile(revision, path string, contents []byte) {
+func (v *StrVCS) SetFile(revision, path string, contents []byte) {
 	if v.files == nil {
 		v.files = make(map[string]map[string][]byte)
 	}
@@ -71,7 +71,7 @@ func (v *strvcs) SetFile(revision, path string, contents []byte) {
 	v.files[revision][path] = contents
 }
 
-func (v strvcs) ReadDir(revision, path string) ([]string, error) {
+func (v StrVCS) ReadDir(revision, path string) ([]string, error) {
 	var files []string
 	for file := range v.files[revision] {
 		files = append(files, file)
@@ -79,6 +79,6 @@ func (v strvcs) ReadDir(revision, path string) ([]string, error) {
 	return files, nil
 }
 
-func (v strvcs) ReadFile(revision, path string) ([]byte, error) {
+func (v StrVCS) ReadFile(revision, path string) ([]byte, error) {
 	return v.files[revision][path], nil
 }

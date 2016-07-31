@@ -11,7 +11,7 @@ import (
 
 func TestParse(t *testing.T) {
 	// Create strvcs and fill it with test data
-	vcs := strvcs{}
+	vcs := StrVCS{}
 
 	rev1, err := ioutil.ReadFile("testdata/before.go")
 	if err != nil {
@@ -26,10 +26,10 @@ func TestParse(t *testing.T) {
 	vcs.SetFile("rev2", "abitest.go", rev2)
 
 	// Run checks
-	c := New("rev1", "rev2")
+	c := New()
 	c.vcs = vcs
 
-	changes, err := c.Check()
+	changes, err := c.Check("rev1", "rev2")
 	if err != nil {
 		t.Fatal(err)
 	}
