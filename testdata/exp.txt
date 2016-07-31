@@ -56,17 +56,17 @@ changed (breaking change - members added)
 	}
 changed (breaking change - members changed types)
 	type IfaceChangeMemberArg interface {
-		Member1(int) bool
+		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceChangeMemberArg interface {
-		Member1(uint) bool
+		Member1(arg1 uint) (ret1 bool)
 	}
 changed (breaking change - members changed types)
 	type IfaceChangeMemberReturn interface {
-		Member1(int) bool
+		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceChangeMemberReturn interface {
-		Member1(int) int
+		Member1(arg1 int) (ret1 int)
 	}
 changed (non-breaking change - members removed)
 	type IfaceRemMember interface {
@@ -94,10 +94,10 @@ changed (breaking change - changed type of value spec)
 changed (breaking change - changed type)
 	var VarChangeType int
 	var VarChangeType uint
-changed (breaking change - changed of array's length)
+changed (breaking change - changed array/slice's length or type)
 	var VarChangeTypeArrayLen [1]int
 	var VarChangeTypeArrayLen [2]int
-changed (breaking change - changed of array's element's type)
+changed (breaking change - changed array/slice's length or type)
 	var VarChangeTypeArrayType [1]int
 	var VarChangeTypeArrayType [1]uint
 changed (breaking change - changed channel's type)
@@ -124,10 +124,10 @@ changed (breaking change - changed map's value's type)
 changed (breaking change - changed type)
 	var VarChangeTypeSelector bytes.Buffer
 	var VarChangeTypeSelector bytes.Reader
-changed (breaking change - changed of array's element's type)
+changed (breaking change - changed array/slice's length or type)
 	var VarChangeTypeSlice []int
 	var VarChangeTypeSlice []uint
-changed (breaking change - changed of array's length)
+changed (breaking change - changed array/slice's length or type)
 	var VarChangeTypeSliceLen []int
 	var VarChangeTypeSliceLen [1]int
 changed (breaking change - changed type)

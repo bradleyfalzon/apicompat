@@ -13,6 +13,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/bradleyfalzon/abicheck/abicompat"
 )
 
 // Checker is used to check for changes between two versions of a package.
@@ -206,32 +208,6 @@ func (c Checker) Timing() (parseTime, diffTime, sortTime time.Duration) {
 	return c.parseTime, c.diffTime, c.sortTime
 }
 
-type ChangeType uint8
-
-const (
-	ChangeError ChangeType = iota
-	ChangeUnknown
-	ChangeNone
-	ChangeNonBreaking
-	ChangeBreaking
-)
-
-func (c ChangeType) String() string {
-	switch c {
-	case ChangeError:
-		return "parse error"
-	case ChangeUnknown:
-		return "unknowable"
-	case ChangeNone:
-		return "no change"
-	case ChangeNonBreaking:
-		return "non-breaking change"
-	case ChangeBreaking:
-		return "breaking change"
-	}
-	panic(fmt.Sprintf("unknown ChangeType: %d", c))
-}
-
 type OpType uint8
 
 const (
@@ -254,13 +230,13 @@ func (op OpType) String() string {
 
 // change is the ast declaration containing the before and after
 type Change struct {
-	Pkg     string
-	ID      string
-	Summary string
-	Op      OpType
-	Change  ChangeType
-	Before  ast.Decl
-	After   ast.Decl
+	Pkg    string
+	ID     string
+	Msg    string
+	Op     OpType
+	Change string
+	Before ast.Decl
+	After  ast.Decl
 }
 
 func (c Change) String() string {
@@ -269,7 +245,7 @@ func (c Change) String() string {
 	buf := bytes.Buffer{}
 
 	if c.Op == OpChange {
-		fmt.Fprintf(&buf, "%s (%s - %s)\n", c.Op, c.Change, c.Summary)
+		fmt.Fprintf(&buf, "%s (%s - %s)\n", c.Op, c.Change, c.Msg)
 	} else {
 		fmt.Fprintln(&buf, c.Op)
 	}
@@ -297,7 +273,7 @@ func (a byID) Less(i, j int) bool { return a[i].ID < a[j].ID }
 type revDecls map[string]map[string]ast.Decl
 
 type diffError struct {
-	summary string
+	err error
 	bdecl,
 	adecl ast.Decl
 	bpos,
@@ -305,7 +281,7 @@ type diffError struct {
 }
 
 func (e diffError) Error() string {
-	return e.summary
+	return e.err.Error()
 }
 
 // compareDecls compares a Checker's before and after declarations and returns
@@ -319,6 +295,8 @@ func (c Checker) compareDecls() ([]Change, error) {
 			continue
 		}
 
+		compat := abicompat.New(c.bTypes[pkg], c.aTypes[pkg])
+
 		for id, bDecl := range bDecls {
 			aDecl, ok := aDecls[id]
 			if !ok {
@@ -328,23 +306,24 @@ func (c Checker) compareDecls() ([]Change, error) {
 			}
 
 			// in before and in after, check if there's a difference
-			changeType, summary := compareDecl(bDecl, aDecl)
+			change, err := compat.Check(bDecl, aDecl)
+			if err != nil {
+				return nil, &diffError{err: err, bdecl: bDecl, adecl: aDecl}
+			}
 
-			switch changeType {
-			case ChangeNone, ChangeUnknown:
+			switch change.Change {
+			case abicompat.None, abicompat.Unknown:
 				continue
-			case ChangeError:
-				return nil, &diffError{summary: summary, bdecl: bDecl, adecl: aDecl}
 			}
 
 			changes = append(changes, Change{
-				Pkg:     pkg,
-				ID:      id,
-				Op:      OpChange,
-				Change:  changeType,
-				Summary: summary,
-				Before:  bDecl,
-				After:   aDecl,
+				Pkg:    pkg,
+				ID:     id,
+				Op:     OpChange,
+				Change: change.Change,
+				Msg:    change.Msg,
+				Before: bDecl,
+				After:  aDecl,
 			})
 		}
 

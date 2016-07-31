@@ -1,24 +1,51 @@
-package abicheck
+package abicompat
 
 import (
-	"bytes"
 	"fmt"
 	"go/ast"
-	"go/printer"
-	"go/token"
+	"go/types"
 	"reflect"
 	"strconv"
 )
 
+const (
+	Unknown     = "unknown change"
+	None        = "no change"
+	NonBreaking = "non-breaking change"
+	Breaking    = "breaking change"
+)
+
+type Change struct {
+	Change string
+	Msg    string
+}
+
+type Checker struct {
+	btypes *types.Checker
+	atypes *types.Checker
+}
+
+func New(btypes, atypes *types.Checker) *Checker {
+	return &Checker{
+		btypes: btypes,
+		atypes: atypes,
+	}
+}
+
+func nonBreaking(msg string) (*Change, error) { return &Change{Change: NonBreaking, Msg: msg}, nil }
+func breaking(msg string) (*Change, error)    { return &Change{Change: Breaking, Msg: msg}, nil }
+func unknown(msg string) (*Change, error)     { return &Change{Change: Unknown, Msg: msg}, nil }
+func none() (*Change, error)                  { return &Change{Change: None}, nil }
+
 // equal compares two declarations and returns true if they do not have
 // incompatible changes. For example, comments aren't compared, names of
 // arguments aren't compared etc.
-func compareDecl(before, after ast.Decl) (ChangeType, string) {
+func (c Checker) Check(before, after ast.Decl) (*Change, error) {
 	// compare types, ignore comments etc, so reflect.DeepEqual isn't good enough
 
 	if reflect.TypeOf(before) != reflect.TypeOf(after) {
 		// Declaration type changed, such as GenDecl to FuncDecl (eg var/const to func)
-		return ChangeBreaking, "changed declaration"
+		return breaking("changed declaration")
 	}
 
 	switch b := before.(type) {
@@ -29,7 +56,7 @@ func compareDecl(before, after ast.Decl) (ChangeType, string) {
 
 		if reflect.TypeOf(b.Specs[0]) != reflect.TypeOf(a.Specs[0]) {
 			// Spec changed, such as ValueSpec to TypeSpec (eg var/const to struct)
-			return ChangeBreaking, "changed spec"
+			return breaking("changed spec")
 		}
 
 		switch bspec := b.Specs[0].(type) {
@@ -39,65 +66,58 @@ func compareDecl(before, after ast.Decl) (ChangeType, string) {
 			if bspec.Type == nil || aspec.Type == nil {
 				// eg: var ErrSomeError = errors.New("Some Error")
 				// cannot currently determine the type
-				return ChangeUnknown, "cannot currently determine type"
-			}
 
-			// TODO perhaps just make this entire thing use
-			// exprEqual(bspec.Type, aspect.Type) but we'll lose some details
+				return unknown("cannot currently determine type")
+			}
 
 			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
 				// eg change from int to []int
-				return ChangeBreaking, "changed value spec type"
+				return breaking("changed value spec type")
 			}
 
 			// var / const
 			switch btype := bspec.Type.(type) {
 			case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
 				// int/string/etc or bytes.Buffer/etc or *int/*bytes.Buffer/etc
-				if !exprEqual(bspec.Type, aspec.Type) {
+				if c.btypes.TypeOf(bspec.Type) != c.atypes.TypeOf(aspec.Type) {
 					// type changed
-					return ChangeBreaking, "changed type"
+					return breaking("changed type")
 				}
 			case *ast.ArrayType:
 				// slice/array
 				atype := aspec.Type.(*ast.ArrayType)
-				// compare length
-				if !exprEqual(btype.Len, atype.Len) {
-					// change of length, or between array and slice
-					return ChangeBreaking, "changed of array's length"
-				}
-				// compare array's element's type
-				if !exprEqual(btype.Elt, atype.Elt) {
-					return ChangeBreaking, "changed of array's element's type"
+				if !c.exprEqual(btype, atype) {
+					// change of length, or between array and slice or type
+					return breaking("changed array/slice's length or type")
 				}
 			case *ast.MapType:
 				// map
 				atype := aspec.Type.(*ast.MapType)
 
-				if !exprEqual(btype.Key, atype.Key) {
-					return ChangeBreaking, "changed map's key's type"
+				if !c.exprEqual(btype.Key, atype.Key) {
+					return breaking("changed map's key's type")
 				}
-				if !exprEqual(btype.Value, atype.Value) {
-					return ChangeBreaking, "changed map's value's type"
+				if !c.exprEqual(btype.Value, atype.Value) {
+					return breaking("changed map's value's type")
 				}
 			case *ast.InterfaceType:
 				// this is a special case for just interface{}
 				atype := aspec.Type.(*ast.InterfaceType)
-				return compareInterfaceType(btype, atype)
+				return c.checkInterface(btype, atype)
 			case *ast.ChanType:
 				// channel
 				atype := aspec.Type.(*ast.ChanType)
-				return compareChanType(btype, atype)
+				return c.checkChan(btype, atype)
 			case *ast.FuncType:
 				// func
 				atype := aspec.Type.(*ast.FuncType)
-				return compareFuncType(btype, atype)
+				return c.checkFunc(btype, atype)
 			case *ast.StructType:
 				// anonymous struct
 				atype := aspec.Type.(*ast.StructType)
-				return compareStructType(btype, atype)
+				return c.checkStruct(btype, atype)
 			default:
-				return ChangeError, fmt.Sprintf("Unknown val spec type: %T, source: %s", btype, typeToString(before))
+				return nil, fmt.Errorf("unknown val spec type: %T", btype)
 			}
 		case *ast.TypeSpec:
 			aspec := a.Specs[0].(*ast.TypeSpec)
@@ -106,93 +126,95 @@ func compareDecl(before, after ast.Decl) (ChangeType, string) {
 
 			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
 				// Spec change, such as from StructType to InterfaceType or different aliased types
-				return ChangeBreaking, "changed type of value spec"
+				return breaking("changed type of value spec")
 			}
 
 			switch btype := bspec.Type.(type) {
 			case *ast.InterfaceType:
 				atype := aspec.Type.(*ast.InterfaceType)
-				return compareInterfaceType(btype, atype)
+				return c.checkInterface(btype, atype)
 			case *ast.StructType:
 				atype := aspec.Type.(*ast.StructType)
-				return compareStructType(btype, atype)
+				return c.checkStruct(btype, atype)
 			case *ast.Ident:
 				// alias
 				atype := aspec.Type.(*ast.Ident)
 				if btype.Name != atype.Name {
 					// Alias typing changed underlying types
-					return ChangeBreaking, "alias changed its underlying type"
+					return breaking("alias changed its underlying type")
 				}
 			}
 		}
 	case *ast.FuncDecl:
 		a := after.(*ast.FuncDecl)
-		return compareFuncType(b.Type, a.Type)
+		return c.checkFunc(b.Type, a.Type)
 	default:
-		return ChangeError, fmt.Sprintf("Unknown declaration type: %T, source: %s", before, typeToString(before))
+		return nil, fmt.Errorf("unknown declaration type: %T", before)
 	}
-	return ChangeNone, ""
+	return none()
 }
 
-func compareChanType(before, after *ast.ChanType) (ChangeType, string) {
-	if !exprEqual(before.Value, after.Value) {
-		return ChangeBreaking, "changed channel's type"
+func (c Checker) checkChan(before, after *ast.ChanType) (*Change, error) {
+	if !c.exprEqual(before.Value, after.Value) {
+		return breaking("changed channel's type")
 	}
 
 	// If we're specifying a direction and it's not the same as before
 	// (if we remove direction then that change isn't breaking)
 	if before.Dir != after.Dir {
 		if after.Dir != ast.SEND && after.Dir != ast.RECV {
-			return ChangeNonBreaking, "removed channel's direction"
+			return nonBreaking("removed channel's direction")
 		}
-		return ChangeBreaking, "changed channel's direction"
+		return breaking("changed channel's direction")
 	}
-	return ChangeNone, ""
+	return none()
 }
 
-func compareInterfaceType(before, after *ast.InterfaceType) (ChangeType, string) {
+func (c Checker) checkInterface(before, after *ast.InterfaceType) (*Change, error) {
 	// interfaces don't care if methods are removed
-	added, removed, changed := diffFields(before.Methods.List, after.Methods.List)
+	added, removed, changed := c.diffFields(before.Methods.List, after.Methods.List)
 	if len(added) > 0 {
 		// Fields were added
-		return ChangeBreaking, "members added"
+		return breaking("members added")
 	} else if len(changed) > 0 {
 		// Fields changed types
-		return ChangeBreaking, "members changed types"
+		return breaking("members changed types")
 	} else if len(removed) > 0 {
-		return ChangeNonBreaking, "members removed"
+		return nonBreaking("members removed")
 	}
 
-	return ChangeNone, ""
+	return none()
 }
-func compareStructType(before, after *ast.StructType) (ChangeType, string) {
+
+func (c Checker) checkStruct(before, after *ast.StructType) (*Change, error) {
 	// structs don't care if fields were added
-	added, removed, changed := diffFields(before.Fields.List, after.Fields.List)
+	added, removed, changed := c.diffFields(before.Fields.List, after.Fields.List)
 	if len(removed) > 0 {
 		// Fields were removed
-		return ChangeBreaking, "members removed"
+		return breaking("members removed")
 	} else if len(changed) > 0 {
 		// Fields changed types
-		return ChangeBreaking, "members changed types"
+		return breaking("members changed types")
 	} else if len(added) > 0 {
-		return ChangeNonBreaking, "members added"
+		return nonBreaking("members added")
 	}
-	return ChangeNone, ""
+	return none()
 }
-func compareFuncType(before, after *ast.FuncType) (ChangeType, string) {
+
+func (c Checker) checkFunc(before, after *ast.FuncType) (*Change, error) {
 	// don't compare argument names
 	bparams := stripNames(before.Params.List)
 	aparams := stripNames(after.Params.List)
 
-	added, removed, changed := diffFields(bparams, aparams)
+	added, removed, changed := c.diffFields(bparams, aparams)
 	if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
-		return ChangeBreaking, "parameters types changed"
+		return breaking("parameters types changed")
 	}
 
 	if before.Results != nil {
 		if after.Results == nil {
 			// removed return parameter
-			return ChangeBreaking, "removed return parameter"
+			return breaking("removed return parameter")
 		}
 
 		// don't compare argument names
@@ -202,19 +224,20 @@ func compareFuncType(before, after *ast.FuncType) (ChangeType, string) {
 		// Adding return parameters to a function, when it didn't have any before is
 		// ok, so only check if for breaking changes if there was parameters before
 		if len(before.Results.List) > 0 {
-			added, removed, changed := diffFields(bresults, aresults)
+			added, removed, changed := c.diffFields(bresults, aresults)
 			if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
-				return ChangeBreaking, "return parameters changed"
+				return breaking("return parameters changed")
 			}
 		}
 	}
 
-	return ChangeNone, ""
+	return none()
 }
 
 // stripNames strips the names from a fieldlist, which is usually a function's
 // (or method's) parameter or results list, these are internal to the function.
-// This returns a good-enough copy of the field list, but isn't a complete copy.
+// This returns a good-enough copy of the field list, but isn't a complete copy
+// as some pointers remain, but no other modifications are made, so it's ok.
 func stripNames(fields []*ast.Field) []*ast.Field {
 	stripped := make([]*ast.Field, 0, len(fields))
 	for _, f := range fields {
@@ -229,7 +252,7 @@ func stripNames(fields []*ast.Field) []*ast.Field {
 	return stripped
 }
 
-func diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Field) {
+func (c Checker) diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Field) {
 	// Presort after for quicker matching of fieldname -> type, may not be worthwhile
 	AfterMembers := make(map[string]*ast.Field)
 	for i, field := range after {
@@ -239,7 +262,7 @@ func diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Fiel
 	for i, bfield := range before {
 		bkey := fieldKey(bfield, i)
 		if afield, ok := AfterMembers[bkey]; ok {
-			if !exprEqual(bfield.Type, afield.Type) {
+			if !c.exprEqual(bfield.Type, afield.Type) {
 				// changed
 				changed = append(changed, bfield)
 			}
@@ -271,7 +294,7 @@ func fieldKey(field *ast.Field, i int) string {
 }
 
 // exprEqual compares two ast.Expr to determine if they are equal
-func exprEqual(before, after ast.Expr) bool {
+func (c Checker) exprEqual(before, after ast.Expr) bool {
 	if reflect.TypeOf(before) != reflect.TypeOf(after) {
 		return false
 	}
@@ -279,37 +302,9 @@ func exprEqual(before, after ast.Expr) bool {
 	switch btype := before.(type) {
 	case *ast.ChanType:
 		atype := after.(*ast.ChanType)
-		change, _ := compareChanType(btype, atype)
-		return change != ChangeBreaking
+		change, _ := c.checkChan(btype, atype)
+		return change.Change != Breaking
 	}
 
-	// For the moment just use typeToString and compare strings
-	return typeToString(before) == typeToString(after)
-}
-
-// typeToString returns a type, such as ident or function and returns a string
-// representation (without superfluous variable names when necessary).
-//
-// This is designed to make comparisons simpler by not having to handle all
-// the various ast permutations, but this is the slowest method and may have
-// its own set of undesirable properties (including a performance penalty).
-// See the equivalent func equalFieldTypes in b3b41cc470d4258b38372b87f22d87845ecfecb6
-// for an example of what it might have been (it was missing some checks though)
-func typeToString(ident interface{}) string {
-	fset := token.FileSet{} // only require non-nil fset
-	// TODO do i need to use the printer? ast has print functions, do they just wrap this?
-	pcfg := printer.Config{Mode: printer.RawFormat}
-	buf := bytes.Buffer{}
-
-	switch v := ident.(type) {
-	case *ast.FuncType:
-		// strip variable names in methods
-		v.Params.List = stripNames(v.Params.List)
-		if v.Results != nil {
-			v.Results.List = stripNames(v.Results.List)
-		}
-	}
-	pcfg.Fprint(&buf, &fset, ident)
-
-	return buf.String()
+	return types.Identical(c.btypes.TypeOf(before), c.atypes.TypeOf(after))
 }
