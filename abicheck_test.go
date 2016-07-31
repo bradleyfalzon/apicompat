@@ -56,6 +56,6 @@ func TestParse(t *testing.T) {
 
 	// Compare results gold master
 	if !reflect.DeepEqual(exp, buf.Bytes()) {
-		t.Errorf("got:\n%v\nexp:\n%v\n", buf, string(exp))
+		t.Errorf("got:\n%v\nexp:\n%v\n", buf.String(), string(exp))
 	}
 }

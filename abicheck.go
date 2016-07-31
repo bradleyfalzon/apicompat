@@ -216,33 +216,13 @@ func (c Checker) Timing() (parseTime, diffTime, sortTime time.Duration) {
 	return c.parseTime, c.diffTime, c.sortTime
 }
 
-type OpType uint8
-
-const (
-	OpAdd OpType = iota
-	OpRemove
-	OpChange
-)
-
-func (op OpType) String() string {
-	switch op {
-	case OpAdd:
-		return "added"
-	case OpRemove:
-		return "removed"
-	case OpChange:
-		return "changed"
-	}
-	panic(fmt.Sprintf("unknown operation type: %d", op))
-}
-
 // change is the ast declaration containing the before and after
 type Change struct {
 	Pkg    string   // Pkg is the name of the package the change occurred in
 	ID     string   // ID is an identifier to match a declaration between versions
 	Msg    string   // Msg describes the change
-	Op     OpType   // Op is the type of operation, such added, removed, changed
 	Change string   // Change describes whether it was unknown, no change, non-breaking or breaking change
+	Pos    string   // Pos is the ASTs position prefixed with a version
 	Before ast.Decl // Before is the previous declaration
 	After  ast.Decl // After is the new declaration
 }
@@ -252,11 +232,7 @@ func (c Change) String() string {
 	pcfg := printer.Config{Mode: printer.RawFormat, Indent: 1}
 	buf := bytes.Buffer{}
 
-	if c.Op == OpChange {
-		fmt.Fprintf(&buf, "%s (%s - %s)\n", c.Op, c.Change, c.Msg)
-	} else {
-		fmt.Fprintln(&buf, c.Op)
-	}
+	fmt.Fprintf(&buf, "%s: %s %s\n", c.Pos, c.Change, c.Msg)
 
 	if c.Before != nil {
 		pcfg.Fprint(&buf, &fset, c.Before)
@@ -309,7 +285,8 @@ func (c Checker) compareDecls() ([]Change, error) {
 			aDecl, ok := aDecls[id]
 			if !ok {
 				// in before, not in after, therefore it was removed
-				changes = append(changes, Change{Pkg: pkg, ID: id, Op: OpRemove, Before: bDecl})
+				c := Change{Pkg: pkg, ID: id, Change: Breaking, Msg: "declaration removed", Pos: c.bFset.Position(bDecl.Pos()).String(), Before: bDecl}
+				changes = append(changes, c)
 				continue
 			}
 
@@ -327,9 +304,9 @@ func (c Checker) compareDecls() ([]Change, error) {
 			changes = append(changes, Change{
 				Pkg:    pkg,
 				ID:     id,
-				Op:     OpChange,
 				Change: change.Change,
 				Msg:    change.Msg,
+				Pos:    c.aFset.Position(aDecl.Pos()).String(),
 				Before: bDecl,
 				After:  aDecl,
 			})
@@ -338,7 +315,8 @@ func (c Checker) compareDecls() ([]Change, error) {
 		for id, aDecl := range aDecls {
 			if _, ok := bDecls[id]; !ok {
 				// in after, not in before, therefore it was added
-				changes = append(changes, Change{Pkg: pkg, ID: id, Op: OpAdd, After: aDecl})
+				c := Change{Pkg: pkg, ID: id, Change: NonBreaking, Msg: "declaration added", Pos: c.aFset.Position(aDecl.Pos()).String(), After: aDecl}
+				changes = append(changes, c)
 			}
 		}
 	}

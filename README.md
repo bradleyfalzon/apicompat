@@ -55,7 +55,7 @@ release notes.
     - Filtering `vendor/` directories (if this is the best place to do it, or leave it to go/type ast packages)
     - Check subdirectories if ran from a subdirectory of the VCS (currently checks all committed code)
 - Add docs, flow diagram and fixing of existing docs
-- Improve output formats, such as vim quickfix
+- Improve output formats (such as vim quickfix), ensure all declarations have positions
 - Move these tasks to GitHub issues
 - Improve test coverage and move away from golden masters (it was just a quick hack, not a long term solution)
 - Once all other steps have been completed, performance will be investigated
