@@ -182,6 +182,15 @@ type FuncRecv struct{}
 func (_ *FuncRecv) Method1(arg1 bool) (ret1 int) { return 1 }
 func (_ FuncRecv) Method2(arg1 bool) (ret1 int)  { return 1 }
 
+// FuncAddVariadic detects addition of a variadic argument to a function (is not a problem)
+func FuncAddVariadic(_ ...int) {}
+
+// FuncChangeToVariadic detects parameter change to variadic of same type (is not a problem)
+func FuncChangeToVariadic(_ ...int) {}
+
+// FuncChangeToVariadicDiffType detects parameter change to variadic of a different type
+func FuncChangeToVariadicDiffType(_ ...uint) {}
+
 // Check support for methods with empty recv list
 //func () Method() {} // TODO add this back via tests, go/types won't parse it
 

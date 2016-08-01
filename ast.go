@@ -207,8 +207,15 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (*DeclChange, error)
 	aparams := stripNames(after.Params.List)
 
 	added, removed, changed := c.diffFields(bparams, aparams)
+	var (
+		msg      string
+		variadic bool
+	)
 	if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
-		return breaking("parameters types changed")
+		msg, variadic = c.variadicChange(added, removed, changed)
+		if !variadic {
+			return breaking("parameter types changed")
+		}
 	}
 
 	if before.Results != nil {
@@ -231,7 +238,35 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (*DeclChange, error)
 		}
 	}
 
+	if variadic {
+		return nonBreaking(msg)
+	}
 	return none()
+}
+
+// variadicChange returns true and a short msg describing the change if the
+// added, removed and changed fields only represent an addition of variadic
+// parameters or changes an existing field to variadic. If any other changes
+// occurred, variadic will be false with an empty msg.
+func (c DeclChecker) variadicChange(added, removed []*ast.Field, changed [][2]*ast.Field) (msg string, variadic bool) {
+	if len(added) == 1 && len(removed) == 0 && len(changed) == 0 {
+		if _, ok := added[0].Type.(*ast.Ellipsis); ok {
+			// we're adding a variadic
+			return "added a variadic parameter", true
+		}
+	}
+
+	if len(added) == 0 && len(removed) == 0 && len(changed) == 1 {
+		btype := changed[0][0].Type
+		variadic, ok := changed[0][1].Type.(*ast.Ellipsis)
+
+		if ok && types.Identical(c.btypes.TypeOf(btype), c.atypes.TypeOf(variadic.Elt)) {
+			// we're changing to a variadic of the same type
+			return "change parameter to variadic", true
+		}
+	}
+
+	return "", false
 }
 
 // stripNames strips the names from a fieldlist, which is usually a function's
@@ -252,7 +287,7 @@ func stripNames(fields []*ast.Field) []*ast.Field {
 	return stripped
 }
 
-func (c DeclChecker) diffFields(before, after []*ast.Field) (added, removed, changed []*ast.Field) {
+func (c DeclChecker) diffFields(before, after []*ast.Field) (added, removed []*ast.Field, changed [][2]*ast.Field) {
 	// Presort after for quicker matching of fieldname -> type, may not be worthwhile
 	AfterMembers := make(map[string]*ast.Field)
 	for i, field := range after {
@@ -264,7 +299,7 @@ func (c DeclChecker) diffFields(before, after []*ast.Field) (added, removed, cha
 		if afield, ok := AfterMembers[bkey]; ok {
 			if !c.exprEqual(bfield.Type, afield.Type) {
 				// changed
-				changed = append(changed, bfield)
+				changed = append(changed, [2]*ast.Field{bfield, afield})
 			}
 			delete(AfterMembers, bkey)
 			continue

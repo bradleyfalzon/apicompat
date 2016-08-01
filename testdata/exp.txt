@@ -7,19 +7,22 @@ rev2:abitest.go:9: non-breaking change declaration added
 	const ConstMultiSpecB int = 0
 rev1:abitest.go:16: breaking change declaration removed
 	const ConstRemoved int = 0
-rev2:abitest.go:148: breaking change parameters types changed
+rev2:abitest.go:148: breaking change parameter types changed
 	func FuncAddArg()
 	func FuncAddArg(arg1 int)
 rev2:abitest.go:169: breaking change return parameters changed
 	func FuncAddRetMore() error
 	func FuncAddRetMore() (error, bool)
-rev2:abitest.go:154: breaking change parameters types changed
+rev2:abitest.go:186: non-breaking change added a variadic parameter
+	func FuncAddVariadic()
+	func FuncAddVariadic(_ ...int)
+rev2:abitest.go:154: breaking change parameter types changed
 	func FuncChangeArg(arg1 int)
 	func FuncChangeArg(param uint)
-rev2:abitest.go:157: breaking change parameters types changed
+rev2:abitest.go:157: breaking change parameter types changed
 	func FuncChangeChan(arg1 chan int)
 	func FuncChangeChan(arg1 chan uint)
-rev2:abitest.go:160: breaking change parameters types changed
+rev2:abitest.go:160: breaking change parameter types changed
 	func FuncChangeChanDir(arg1 chan int)
 	func FuncChangeChanDir(arg1 <-chan int)
 rev2:abitest.go:175: breaking change return parameters changed
@@ -31,13 +34,19 @@ rev2:abitest.go:176: breaking change return parameters changed
 rev2:abitest.go:177: breaking change return parameters changed
 	func FuncChangeRetStarSelector() *bytes.Buffer
 	func FuncChangeRetStarSelector() *bytes.Reader
-rev2:abitest.go:182: breaking change parameters types changed
+rev2:abitest.go:189: non-breaking change change parameter to variadic
+	func FuncChangeToVariadic(_ int)
+	func FuncChangeToVariadic(_ ...int)
+rev2:abitest.go:192: breaking change parameter types changed
+	func FuncChangeToVariadicDiffType(_ int)
+	func FuncChangeToVariadicDiffType(_ ...uint)
+rev2:abitest.go:182: breaking change parameter types changed
 	func (_ *FuncRecv) Method1(arg1 int) (ret1 error)
 	func (_ *FuncRecv) Method1(arg1 bool) (ret1 int)
-rev2:abitest.go:183: breaking change parameters types changed
+rev2:abitest.go:183: breaking change parameter types changed
 	func (_ FuncRecv) Method2(arg1 int) (ret1 error)
 	func (_ FuncRecv) Method2(arg1 bool) (ret1 int)
-rev2:abitest.go:151: breaking change parameters types changed
+rev2:abitest.go:151: breaking change parameter types changed
 	func FuncRemArg(arg1 int)
 	func FuncRemArg()
 rev2:abitest.go:172: breaking change removed return parameter
@@ -109,7 +118,7 @@ rev2:abitest.go:46: breaking change changed channel's direction
 rev2:abitest.go:49: non-breaking change removed channel's direction
 	var VarChangeTypeChanDirRelax <-chan int
 	var VarChangeTypeChanDirRelax chan int
-rev2:abitest.go:58: breaking change parameters types changed
+rev2:abitest.go:58: breaking change parameter types changed
 	var VarChangeTypeFuncParam func(int) error
 	var VarChangeTypeFuncParam func(uint) error
 rev2:abitest.go:61: breaking change return parameters changed
