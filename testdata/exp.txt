@@ -1,144 +1,144 @@
--: non-breaking change declaration added
+rev2:abitest.go:13: non-breaking change declaration added
 	const ConstAdded int = 0
--: breaking change changed type
+rev2:abitest.go:25: breaking change changed type
 	const ConstChangeType int = 0
 	const ConstChangeType uint = 0
--: non-breaking change declaration added
+rev2:abitest.go:9: non-breaking change declaration added
 	const ConstMultiSpecB int = 0
--: breaking change declaration removed
+rev1:abitest.go:16: breaking change declaration removed
 	const ConstRemoved int = 0
-rev2:abitest.go:148:1: breaking change parameters types changed
+rev2:abitest.go:148: breaking change parameters types changed
 	func FuncAddArg()
 	func FuncAddArg(arg1 int)
-rev2:abitest.go:169:1: breaking change return parameters changed
+rev2:abitest.go:169: breaking change return parameters changed
 	func FuncAddRetMore() error
 	func FuncAddRetMore() (error, bool)
-rev2:abitest.go:154:1: breaking change parameters types changed
+rev2:abitest.go:154: breaking change parameters types changed
 	func FuncChangeArg(arg1 int)
 	func FuncChangeArg(param uint)
-rev2:abitest.go:157:1: breaking change parameters types changed
+rev2:abitest.go:157: breaking change parameters types changed
 	func FuncChangeChan(arg1 chan int)
 	func FuncChangeChan(arg1 chan uint)
-rev2:abitest.go:160:1: breaking change parameters types changed
+rev2:abitest.go:160: breaking change parameters types changed
 	func FuncChangeChanDir(arg1 chan int)
 	func FuncChangeChanDir(arg1 <-chan int)
-rev2:abitest.go:175:1: breaking change return parameters changed
+rev2:abitest.go:175: breaking change return parameters changed
 	func FuncChangeRet() error
 	func FuncChangeRet() bool
-rev2:abitest.go:176:1: breaking change return parameters changed
+rev2:abitest.go:176: breaking change return parameters changed
 	func FuncChangeRetStarIdent() *int
 	func FuncChangeRetStarIdent() *uint
-rev2:abitest.go:177:1: breaking change return parameters changed
+rev2:abitest.go:177: breaking change return parameters changed
 	func FuncChangeRetStarSelector() *bytes.Buffer
 	func FuncChangeRetStarSelector() *bytes.Reader
-rev2:abitest.go:182:1: breaking change parameters types changed
+rev2:abitest.go:182: breaking change parameters types changed
 	func (_ *FuncRecv) Method1(arg1 int) (ret1 error)
 	func (_ *FuncRecv) Method1(arg1 bool) (ret1 int)
-rev2:abitest.go:183:1: breaking change parameters types changed
+rev2:abitest.go:183: breaking change parameters types changed
 	func (_ FuncRecv) Method2(arg1 int) (ret1 error)
 	func (_ FuncRecv) Method2(arg1 bool) (ret1 int)
-rev2:abitest.go:151:1: breaking change parameters types changed
+rev2:abitest.go:151: breaking change parameters types changed
 	func FuncRemArg(arg1 int)
 	func FuncRemArg()
-rev2:abitest.go:172:1: breaking change removed return parameter
+rev2:abitest.go:172: breaking change removed return parameter
 	func FuncRemRet() error
 	func FuncRemRet()
--: breaking change changed spec
+rev2:abitest.go:22: breaking change changed spec
 	const GenDeclSpecChange int = 1
 	type GenDeclSpecChange struct{}
-rev2:abitest.go:19:1: breaking change changed declaration
+rev2:abitest.go:19: breaking change changed declaration
 	const GenFuncDeclChange int = 1
 	func GenFuncDeclChange()
--: breaking change members added
+rev2:abitest.go:116: breaking change members added
 	type IfaceAddMember interface{}
 	type IfaceAddMember interface {
 		Member1(arg1 int) (ret1 bool)
 	}
--: breaking change members changed types
+rev2:abitest.go:131: breaking change members changed types
 	type IfaceChangeMemberArg interface {
 		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceChangeMemberArg interface {
 		Member1(arg1 uint) (ret1 bool)
 	}
--: breaking change members changed types
+rev2:abitest.go:136: breaking change members changed types
 	type IfaceChangeMemberReturn interface {
 		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceChangeMemberReturn interface {
 		Member1(arg1 int) (ret1 int)
 	}
--: non-breaking change members removed
+rev2:abitest.go:121: non-breaking change members removed
 	type IfaceRemMember interface {
 		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceRemMember interface{}
--: non-breaking change members added
+rev2:abitest.go:101: non-breaking change members added
 	type StructAddMember struct{}
 	type StructAddMember struct {
 		Member1	int
 		Member2	[]int
 	}
--: breaking change members changed types
+rev2:abitest.go:111: breaking change members changed types
 	type StructChangeMember struct{ Member1 int }
 	type StructChangeMember struct{ Member1 uint }
--: breaking change members removed
+rev2:abitest.go:106: breaking change members removed
 	type StructRemMember struct{ Member1 int }
 	type StructRemMember struct{}
--: breaking change alias changed its underlying type
+rev2:abitest.go:139: breaking change alias changed its underlying type
 	type TypeAlias int
 	type TypeAlias uint
--: breaking change changed type of value spec
+rev2:abitest.go:95: breaking change changed type of value spec
 	type TypeSpecChange struct{}
 	type TypeSpecChange interface{}
--: breaking change changed type
+rev2:abitest.go:31: breaking change changed type
 	var VarChangeType int
 	var VarChangeType uint
--: breaking change changed array/slice's length or type
+rev2:abitest.go:76: breaking change changed array/slice's length or type
 	var VarChangeTypeArrayLen [1]int
 	var VarChangeTypeArrayLen [2]int
--: breaking change changed array/slice's length or type
+rev2:abitest.go:79: breaking change changed array/slice's length or type
 	var VarChangeTypeArrayType [1]int
 	var VarChangeTypeArrayType [1]uint
--: breaking change changed channel's type
+rev2:abitest.go:43: breaking change changed channel's type
 	var VarChangeTypeChan chan int
 	var VarChangeTypeChan chan uint
--: breaking change changed channel's direction
+rev2:abitest.go:46: breaking change changed channel's direction
 	var VarChangeTypeChanDir chan int
 	var VarChangeTypeChanDir <-chan int
--: non-breaking change removed channel's direction
+rev2:abitest.go:49: non-breaking change removed channel's direction
 	var VarChangeTypeChanDirRelax <-chan int
 	var VarChangeTypeChanDirRelax chan int
--: breaking change parameters types changed
+rev2:abitest.go:58: breaking change parameters types changed
 	var VarChangeTypeFuncParam func(int) error
 	var VarChangeTypeFuncParam func(uint) error
--: breaking change return parameters changed
+rev2:abitest.go:61: breaking change return parameters changed
 	var VarChangeTypeFuncResult func(int) error
 	var VarChangeTypeFuncResult func(int) bool
--: breaking change changed map's key's type
+rev2:abitest.go:82: breaking change changed map's key's type
 	var VarChangeTypeMapKey map[int]int
 	var VarChangeTypeMapKey map[uint]int
--: breaking change changed map's value's type
+rev2:abitest.go:85: breaking change changed map's value's type
 	var VarChangeTypeMapValue map[int]int
 	var VarChangeTypeMapValue map[int]uint
--: breaking change changed type
+rev2:abitest.go:88: breaking change changed type
 	var VarChangeTypeSelector bytes.Buffer
 	var VarChangeTypeSelector bytes.Reader
--: breaking change changed array/slice's length or type
+rev2:abitest.go:70: breaking change changed array/slice's length or type
 	var VarChangeTypeSlice []int
 	var VarChangeTypeSlice []uint
--: breaking change changed array/slice's length or type
+rev2:abitest.go:73: breaking change changed array/slice's length or type
 	var VarChangeTypeSliceLen []int
 	var VarChangeTypeSliceLen [1]int
--: breaking change changed type
+rev2:abitest.go:91: breaking change changed type
 	var VarChangeTypeStar *int
 	var VarChangeTypeStar *uint
--: breaking change changed type
+rev2:abitest.go:92: breaking change changed type
 	var VarChangeTypeStarSelector *bytes.Buffer
 	var VarChangeTypeStarSelector *bytes.Reader
--: breaking change changed value spec type
+rev2:abitest.go:34: breaking change changed value spec type
 	var VarChangeValSpecType int
 	var VarChangeValSpecType []int
--: breaking change removed return parameter
+rev2:abitest.go:67: breaking change removed return parameter
 	var VarRemoveTypeFuncResult func(int) error
 	var VarRemoveTypeFuncResult func(int)

@@ -285,7 +285,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 			aDecl, ok := aDecls[id]
 			if !ok {
 				// in before, not in after, therefore it was removed
-				c := Change{Pkg: pkg, ID: id, Change: Breaking, Msg: "declaration removed", Pos: c.bFset.Position(bDecl.Pos()).String(), Before: bDecl}
+				c := Change{Pkg: pkg, ID: id, Change: Breaking, Msg: "declaration removed", Pos: pos(c.bFset, bDecl), Before: bDecl}
 				changes = append(changes, c)
 				continue
 			}
@@ -306,7 +306,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 				ID:     id,
 				Change: change.Change,
 				Msg:    change.Msg,
-				Pos:    c.aFset.Position(aDecl.Pos()).String(),
+				Pos:    pos(c.aFset, aDecl),
 				Before: bDecl,
 				After:  aDecl,
 			})
@@ -315,11 +315,28 @@ func (c Checker) compareDecls() ([]Change, error) {
 		for id, aDecl := range aDecls {
 			if _, ok := bDecls[id]; !ok {
 				// in after, not in before, therefore it was added
-				c := Change{Pkg: pkg, ID: id, Change: NonBreaking, Msg: "declaration added", Pos: c.aFset.Position(aDecl.Pos()).String(), After: aDecl}
+				c := Change{Pkg: pkg, ID: id, Change: NonBreaking, Msg: "declaration added", Pos: pos(c.aFset, aDecl), After: aDecl}
 				changes = append(changes, c)
 			}
 		}
 	}
 
 	return changes, nil
+}
+
+// pos returns the declaration's position within a file.
+//
+// For some reason Pos does not work on a ast.GenDec, it's only working on a
+// ast.FuncDec but I'm not certain why. Fortunately, when Pos is invalid, End()
+// has always been valid, so just use that.
+//
+// TODO fixme, this function shouldn't be required for the above reason.
+func pos(fset *token.FileSet, decl ast.Decl) string {
+	p := decl.Pos()
+	if !p.IsValid() {
+		p = decl.End()
+	}
+
+	pos := fset.Position(p)
+	return fmt.Sprintf("%s:%d", pos.Filename, pos.Line)
 }
