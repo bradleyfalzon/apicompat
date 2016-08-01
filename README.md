@@ -40,7 +40,6 @@ release notes.
 
 `abicheck` is currently under heavy development and refactoring. This initial version was a proof of concept and shortcuts were taken. The current tasks are focused on (but not limited to):
 
-- ~~Code clean up, such as removing custom types and making it library friendly~~
 - Add type checking to analyse inferred types
 - Choosing of import paths as the first argument, similar to other tools (no argument means just current directory, else
     support `./...` and specifying)
@@ -55,7 +54,7 @@ release notes.
     - Filtering `vendor/` directories (if this is the best place to do it, or leave it to go/type ast packages)
     - Check subdirectories if ran from a subdirectory of the VCS (currently checks all committed code)
 - Add docs, flow diagram and fixing of existing docs
-- Improve output formats (such as vim quickfix), ensure all declarations have positions
+- Improve output formats (such as vim quickfix)
 - Move these tasks to GitHub issues
 - Improve test coverage and move away from golden masters (it was just a quick hack, not a long term solution)
 - Once all other steps have been completed, performance will be investigated
