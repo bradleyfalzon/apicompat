@@ -1,11 +1,15 @@
 package abicheck
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
+	"go/parser"
+	"go/token"
 	"go/types"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -21,15 +25,12 @@ type DeclChange struct {
 }
 
 type DeclChecker struct {
-	btypes *types.Checker
-	atypes *types.Checker
+	binfo *types.Info
+	ainfo *types.Info
 }
 
-func NewDeclChecker(btypes, atypes *types.Checker) *DeclChecker {
-	return &DeclChecker{
-		btypes: btypes,
-		atypes: atypes,
-	}
+func NewDeclChecker(bi, ai *types.Info) *DeclChecker {
+	return &DeclChecker{binfo: bi, ainfo: ai}
 }
 
 func nonBreaking(msg string) (*DeclChange, error) { return &DeclChange{NonBreaking, msg}, nil }
@@ -79,7 +80,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
 			switch btype := bspec.Type.(type) {
 			case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
 				// int/string/etc or bytes.Buffer/etc or *int/*bytes.Buffer/etc
-				if c.btypes.TypeOf(bspec.Type) != c.atypes.TypeOf(aspec.Type) {
+				if c.binfo.TypeOf(bspec.Type) != c.ainfo.TypeOf(aspec.Type) {
 					// type changed
 					return breaking("changed type")
 				}
@@ -172,14 +173,14 @@ func (c DeclChecker) checkChan(before, after *ast.ChanType) (*DeclChange, error)
 
 func (c DeclChecker) checkInterface(before, after *ast.InterfaceType) (*DeclChange, error) {
 	// interfaces don't care if methods are removed
-	added, removed, changed := c.diffFields(before.Methods.List, after.Methods.List)
-	if len(added) > 0 {
+	r := c.diffFields(before.Methods.List, after.Methods.List)
+	if r.Added() {
 		// Fields were added
 		return breaking("members added")
-	} else if len(changed) > 0 {
+	} else if r.Modified() {
 		// Fields changed types
 		return breaking("members changed types")
-	} else if len(removed) > 0 {
+	} else if r.Removed() {
 		return nonBreaking("members removed")
 	}
 
@@ -188,14 +189,14 @@ func (c DeclChecker) checkInterface(before, after *ast.InterfaceType) (*DeclChan
 
 func (c DeclChecker) checkStruct(before, after *ast.StructType) (*DeclChange, error) {
 	// structs don't care if fields were added
-	added, removed, changed := c.diffFields(before.Fields.List, after.Fields.List)
-	if len(removed) > 0 {
+	r := c.diffFields(before.Fields.List, after.Fields.List)
+	if r.Removed() {
 		// Fields were removed
 		return breaking("members removed")
-	} else if len(changed) > 0 {
+	} else if r.Modified() {
 		// Fields changed types
 		return breaking("members changed types")
-	} else if len(added) > 0 {
+	} else if r.Added() {
 		return nonBreaking("members added")
 	}
 	return none()
@@ -206,16 +207,14 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (*DeclChange, error)
 	bparams := stripNames(before.Params.List)
 	aparams := stripNames(after.Params.List)
 
-	added, removed, changed := c.diffFields(bparams, aparams)
-	var (
-		msg      string
-		variadic bool
-	)
-	if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
-		msg, variadic = c.variadicChange(added, removed, changed)
-		if !variadic {
-			return breaking("parameter types changed")
-		}
+	r := c.diffFields(bparams, aparams)
+	variadicMsg := r.RemoveVariadicCompatible(c)
+	interfaceMsg, err := r.RemoveInterfaceCompatible(c)
+	if err != nil {
+		return nil, err
+	}
+	if r.Changed() {
+		return breaking("parameter types changed")
 	}
 
 	if before.Results != nil {
@@ -231,42 +230,105 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (*DeclChange, error)
 		// Adding return parameters to a function, when it didn't have any before is
 		// ok, so only check if for breaking changes if there was parameters before
 		if len(before.Results.List) > 0 {
-			added, removed, changed := c.diffFields(bresults, aresults)
-			if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
+			r := c.diffFields(bresults, aresults)
+			if r.Changed() {
 				return breaking("return parameters changed")
 			}
 		}
 	}
 
-	if variadic {
-		return nonBreaking(msg)
+	switch {
+	case interfaceMsg != "":
+		return nonBreaking(interfaceMsg)
+	case variadicMsg != "":
+		return nonBreaking(variadicMsg)
+	default:
+		return none()
 	}
-	return none()
 }
 
-// variadicChange returns true and a short msg describing the change if the
-// added, removed and changed fields only represent an addition of variadic
-// parameters or changes an existing field to variadic. If any other changes
-// occurred, variadic will be false with an empty msg.
-func (c DeclChecker) variadicChange(added, removed []*ast.Field, changed [][2]*ast.Field) (msg string, variadic bool) {
-	if len(added) == 1 && len(removed) == 0 && len(changed) == 0 {
-		if _, ok := added[0].Type.(*ast.Ellipsis); ok {
+type diffResult struct {
+	added,
+	removed []*ast.Field
+	modified [][2]*ast.Field
+}
+
+// Changed returns true if any of the fields were added, removed or modified
+func (d diffResult) Changed() bool {
+	return len(d.added) > 0 || len(d.removed) > 0 || len(d.modified) > 0
+}
+
+func (d diffResult) Added() bool    { return len(d.added) > 0 }
+func (d diffResult) Removed() bool  { return len(d.removed) > 0 }
+func (d diffResult) Modified() bool { return len(d.modified) > 0 }
+
+// RemoveVariadicCompatible removes changes and returns a short msg describing
+// the change if the added, removed and changed fields only represent an
+// addition of variadic parameters or changes an existing field to variadic.
+// If no compatible variadic changes were detected, msg will be an empty msg.
+func (d *diffResult) RemoveVariadicCompatible(chkr DeclChecker) (msg string) {
+	if len(d.added) == 1 && !d.Removed() && !d.Modified() {
+		if _, ok := d.added[0].Type.(*ast.Ellipsis); ok {
 			// we're adding a variadic
-			return "added a variadic parameter", true
+			d.added = []*ast.Field{}
+			return "added a variadic parameter"
 		}
 	}
 
-	if len(added) == 0 && len(removed) == 0 && len(changed) == 1 {
-		btype := changed[0][0].Type
-		variadic, ok := changed[0][1].Type.(*ast.Ellipsis)
+	if !d.Added() && !d.Removed() && len(d.modified) == 1 {
+		btype := d.modified[0][0].Type
+		variadic, ok := d.modified[0][1].Type.(*ast.Ellipsis)
 
-		if ok && types.Identical(c.btypes.TypeOf(btype), c.atypes.TypeOf(variadic.Elt)) {
+		if ok && types.Identical(chkr.binfo.TypeOf(btype), chkr.ainfo.TypeOf(variadic.Elt)) {
 			// we're changing to a variadic of the same type
-			return "change parameter to variadic", true
+			d.modified = [][2]*ast.Field{}
+			return "change parameter to variadic"
+		}
+	}
+	return ""
+}
+
+func (d *diffResult) RemoveInterfaceCompatible(chkr DeclChecker) (msg string, err error) {
+	var compatible []int
+	for i, mod := range d.modified {
+		before, after := mod[0].Type, mod[1].Type
+		btype, atype := chkr.binfo.TypeOf(before), chkr.ainfo.TypeOf(after)
+		if btype != nil && atype != nil && types.IsInterface(btype) && types.IsInterface(atype) {
+			bint, err := exprInterfaceType(chkr.binfo.Uses, before)
+			if err != nil {
+				return msg, err
+			}
+			aint, err := exprInterfaceType(chkr.ainfo.Uses, after)
+			if err != nil {
+				return msg, err
+			}
+
+			change, err := chkr.checkInterface(bint, aint)
+			if err != nil {
+				return msg, err
+			}
+			if change.Change != Breaking {
+				compatible = append(compatible, i)
+				msg = "compatible interface change"
+			}
 		}
 	}
 
-	return "", false
+	// TODO cleanup
+	modified := [][2]*ast.Field{}
+	for i := range d.modified {
+		var keep bool = true
+		for c := range compatible {
+			if c == i {
+				keep = false
+			}
+		}
+		if keep {
+			modified = append(modified, d.modified[i])
+		}
+	}
+	d.modified = modified
+	return msg, nil
 }
 
 // stripNames strips the names from a fieldlist, which is usually a function's
@@ -287,34 +349,36 @@ func stripNames(fields []*ast.Field) []*ast.Field {
 	return stripped
 }
 
-func (c DeclChecker) diffFields(before, after []*ast.Field) (added, removed []*ast.Field, changed [][2]*ast.Field) {
+func (c DeclChecker) diffFields(before, after []*ast.Field) diffResult {
 	// Presort after for quicker matching of fieldname -> type, may not be worthwhile
 	AfterMembers := make(map[string]*ast.Field)
 	for i, field := range after {
 		AfterMembers[fieldKey(field, i)] = field
 	}
 
+	r := diffResult{}
+
 	for i, bfield := range before {
 		bkey := fieldKey(bfield, i)
 		if afield, ok := AfterMembers[bkey]; ok {
 			if !c.exprEqual(bfield.Type, afield.Type) {
-				// changed
-				changed = append(changed, [2]*ast.Field{bfield, afield})
+				// modified
+				r.modified = append(r.modified, [2]*ast.Field{bfield, afield})
 			}
 			delete(AfterMembers, bkey)
 			continue
 		}
 
 		// Removed
-		removed = append(removed, bfield)
+		r.removed = append(r.removed, bfield)
 	}
 
 	// What's left in afterMembers has added
 	for _, afield := range AfterMembers {
-		added = append(added, afield)
+		r.added = append(r.added, afield)
 	}
 
-	return added, removed, changed
+	return r
 }
 
 // Return an appropriate identifier for a field, if it has an ident (name)
@@ -339,7 +403,57 @@ func (c DeclChecker) exprEqual(before, after ast.Expr) bool {
 		atype := after.(*ast.ChanType)
 		change, _ := c.checkChan(btype, atype)
 		return change.Change != Breaking
+	case *ast.Ident:
+		// types.Identical returns false for any custom types when comparing
+		// the results from two different type checkers. So, just compare by
+		// name. Eg, func (_ CustomType) {}, CustomType is not identical, even
+		// though comparing the type itself is.
+		// https://play.golang.org/p/t6P5Uz6fIa
+		return types.ExprString(before) == types.ExprString(after)
 	}
 
-	return types.Identical(c.btypes.TypeOf(before), c.atypes.TypeOf(after))
+	return types.Identical(c.binfo.TypeOf(before), c.ainfo.TypeOf(after))
+}
+
+// exprInterfaceType returns a *ast.InterfaceType given an interface type using
+// the worst possible method. It's used to determine whether two interfaces
+// are compatible based on function parameters/results.
+func exprInterfaceType(uses map[*ast.Ident]types.Object, expr ast.Expr) (*ast.InterfaceType, error) {
+	var (
+		pkg string
+		sel *ast.Ident
+	)
+	switch etype := expr.(type) {
+	case *ast.StarExpr:
+		switch estar := etype.X.(type) {
+		case *ast.SelectorExpr:
+			pkg, sel = estar.X.(*ast.Ident).String(), estar.Sel
+		case *ast.Ident:
+			sel = estar
+		}
+	case *ast.SelectorExpr:
+		pkg, sel = etype.X.(*ast.Ident).String(), etype.Sel
+	case *ast.Ident:
+		sel = etype
+	default:
+		return nil, errors.New("unknown interface type")
+	}
+
+	obj, ok := uses[sel]
+	if !ok {
+		return nil, errors.New("could not find interface in uses")
+	}
+
+	// use is: *types.TypeName, string: type io.Writer interface{Write(p []byte) (n int, err error)}
+
+	// Remove the package name from the source in order to parse valid program
+	src := strings.Replace(obj.String(), fmt.Sprintf("type %s.", pkg), "type ", 1)
+	src = fmt.Sprintf("package expr\n%s", src)
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, pkg, src, 0)
+	if err != nil {
+		return nil, fmt.Errorf("%s parsing: %s", err, src)
+	}
+	return file.Decls[0].(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.InterfaceType), nil
 }

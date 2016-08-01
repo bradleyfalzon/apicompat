@@ -1,6 +1,9 @@
 package library
 
-import "bytes"
+import (
+	"bytes"
+	"io"
+)
 
 // ConstMultiSpec* checks support for multiple specs
 const (
@@ -190,6 +193,34 @@ func FuncChangeToVariadic(_ int) {}
 
 // FuncChangeToVariadicDiffType detects parameter change to variadic of a different type
 func FuncChangeToVariadicDiffType(_ int) {}
+
+type T1 interface{}
+type T2 interface {
+	Error() string
+}
+type T3 interface {
+	Member()
+}
+
+// FuncInterface tests for support of comparing interfaces (is not a problem)
+func FuncInterface(_ T1) {}
+
+// FuncInterfaceIncompatible detects changes in interfaces
+func FuncInterfaceIncompatible(_ T1) {}
+
+// FuncInterfaceCompatible detects changes between compatible interfaces (is not a problem)
+func FuncInterfaceCompatible(_ T3) {}
+
+// FuncInterfaceCompatible2 detects changes between compatible interfaces (is not a problem)
+func FuncInterfaceCompatible2(_ io.WriteCloser) {}
+
+// FuncInterfaceCompatible3 detects changes between compatible interfaces (is not a problem)
+func FuncInterfaceCompatible3(_ T2) {}
+
+type C1 int
+
+// FuncCustomType tests for support of comparing custom types
+func FuncCustomType(_ C1) {}
 
 // Check support for methods with empty recv list
 //func () Method() {} // TODO add this back via tests, go/types won't parse it

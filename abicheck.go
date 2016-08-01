@@ -11,22 +11,18 @@ import (
 	"go/token"
 	"go/types"
 	"sort"
-	"sync"
 	"time"
 )
 
 // Checker is used to check for changes between two versions of a package.
 type Checker struct {
-	vcs    VCS
-	bName  string
-	aName  string
-	bFset  *token.FileSet
-	aFset  *token.FileSet
-	bDecls revDecls
-	aDecls revDecls
-	bTypes map[string]*types.Checker
-	aTypes map[string]*types.Checker
-	err    error
+	vcs   VCS
+	bName string
+	aName string
+	b     map[string]pkg
+	a     map[string]pkg
+
+	err error
 
 	parseTime time.Duration
 	diffTime  time.Duration
@@ -52,25 +48,10 @@ func SetVCS(vcs VCS) func(*Checker) {
 }
 
 func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
-
-	var wg sync.WaitGroup
-
 	// Parse revisions from VCS into go/ast
-
 	start := time.Now()
-	wg.Add(1)
-	go func() {
-		c.bFset, c.bDecls, c.bTypes = c.parse(beforeRev)
-		wg.Done()
-	}()
-
-	wg.Add(1)
-	go func() {
-		c.aFset, c.aDecls, c.aTypes = c.parse(afterRev)
-		wg.Done()
-	}()
-
-	wg.Wait()
+	c.b = c.parse(beforeRev)
+	c.a = c.parse(afterRev)
 	c.parseTime = time.Since(start)
 
 	if c.err != nil {
@@ -84,8 +65,8 @@ func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "error processing diff: %s", err)
 		if derr, ok := err.(*diffError); ok {
-			ast.Fprint(&buf, c.bFset, derr.bdecl, ast.NotNilFilter)
-			ast.Fprint(&buf, c.aFset, derr.adecl, ast.NotNilFilter)
+			ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
+			ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)
 		}
 		return nil, errors.New(buf.String())
 	}
@@ -98,60 +79,74 @@ func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
 	return changes, nil
 }
 
-func (c *Checker) parse(rev string) (*token.FileSet, revDecls, map[string]*types.Checker) {
+type pkg struct {
+	fset  *token.FileSet
+	decls map[string]ast.Decl
+	info  *types.Info
+}
+
+func (c *Checker) parse(rev string) map[string]pkg {
 	files, err := c.vcs.ReadDir(rev, "")
 	if err != nil {
 		c.err = err
-		return nil, nil, nil
-	}
-
-	typConfig := &types.Config{
-		IgnoreFuncBodies:         true,
-		DisableUnusedImportCheck: true,
-		Importer:                 importer.Default(),
+		return nil
 	}
 
 	fset := token.NewFileSet()
-	typs := make(map[string]*types.Checker)
-	decls := make(map[string]map[string]ast.Decl) // package to id to decls
-	// TODO is there a concurrency opportunity here?
+	pkgFiles := make(map[string][]*ast.File)
 	for _, file := range files {
 		contents, err := c.vcs.ReadFile(rev, file)
 		if err != nil {
 			c.err = fmt.Errorf("could not read file %s at revision %s: %s", file, rev, err)
-			return nil, nil, nil
+			return nil
 		}
 
 		filename := rev + ":" + file
 		src, err := parser.ParseFile(fset, filename, contents, 0)
 		if err != nil {
 			c.err = fmt.Errorf("could not parse file %s at revision %s: %s", file, rev, err)
-			return nil, nil, nil
+			return nil
 		}
 
 		pkgName := src.Name.Name
-		if decls[pkgName] == nil {
-			decls[pkgName] = make(map[string]ast.Decl)
-		}
-		decls[pkgName] = pkgDecls(src.Decls)
-
-		if typs[pkgName] == nil {
-			pkg := types.NewPackage("", pkgName)
-			info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue)}
-			typs[pkgName] = types.NewChecker(typConfig, fset, pkg, info)
-		}
-		err = typs[pkgName].Files([]*ast.File{src})
-		if err != nil {
-			c.err = fmt.Errorf("could not get types for file %s at revision %s: %s", file, rev, err)
-			return nil, nil, nil
-		}
+		pkgFiles[pkgName] = append(pkgFiles[pkgName], src)
 	}
 
-	return fset, decls, typs
+	// Loop through all the parsed files and type check them
+
+	pkgs := make(map[string]pkg)
+	for pkgName, files := range pkgFiles {
+		pkg := pkg{
+			fset:  fset,
+			decls: make(map[string]ast.Decl),
+			info: &types.Info{
+				Types: make(map[ast.Expr]types.TypeAndValue),
+				Defs:  make(map[*ast.Ident]types.Object),
+				Uses:  make(map[*ast.Ident]types.Object),
+			},
+		}
+
+		for _, file := range files {
+			pkgDecls(pkg.decls, file.Decls)
+		}
+
+		conf := &types.Config{
+			IgnoreFuncBodies:         true,
+			DisableUnusedImportCheck: true,
+			Importer:                 importer.Default(),
+		}
+		_, err := conf.Check("", fset, files, pkg.info)
+		if err != nil {
+			c.err = err
+			return nil
+		}
+
+		pkgs[pkgName] = pkg
+	}
+	return pkgs
 }
 
-func pkgDecls(astDecls []ast.Decl) map[string]ast.Decl {
-	decls := make(map[string]ast.Decl)
+func pkgDecls(decls map[string]ast.Decl, astDecls []ast.Decl) {
 	for _, astDecl := range astDecls {
 		switch d := astDecl.(type) {
 		case *ast.GenDecl:
@@ -208,7 +203,6 @@ func pkgDecls(astDecls []ast.Decl) map[string]ast.Decl {
 			panic(fmt.Errorf("Unknown decl type: %#v", astDecl))
 		}
 	}
-	return decls
 }
 
 // Timing returns individual phase timing information
@@ -252,12 +246,9 @@ func (a byID) Len() int           { return len(a) }
 func (a byID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byID) Less(i, j int) bool { return a[i].ID < a[j].ID }
 
-// revDecls is a map between a package to an id to ast.Decl, where the id is
-// a unique name to match declarations for before and after
-type revDecls map[string]map[string]ast.Decl
-
 type diffError struct {
 	err error
+	pkg string
 	bdecl,
 	adecl ast.Decl
 	bpos,
@@ -272,20 +263,18 @@ func (e diffError) Error() string {
 // all changes or nil and an error
 func (c Checker) compareDecls() ([]Change, error) {
 	var changes []Change
-
-	for pkg, bDecls := range c.bDecls {
-		aDecls, ok := c.aDecls[pkg]
+	for pkgName, bpkg := range c.b {
+		apkg, ok := c.a[pkgName]
 		if !ok {
 			continue
 		}
 
-		d := NewDeclChecker(c.bTypes[pkg], c.aTypes[pkg])
-
-		for id, bDecl := range bDecls {
-			aDecl, ok := aDecls[id]
+		d := NewDeclChecker(bpkg.info, apkg.info)
+		for id, bDecl := range bpkg.decls {
+			aDecl, ok := apkg.decls[id]
 			if !ok {
 				// in before, not in after, therefore it was removed
-				c := Change{Pkg: pkg, ID: id, Change: Breaking, Msg: "declaration removed", Pos: pos(c.bFset, bDecl), Before: bDecl}
+				c := Change{Pkg: pkgName, ID: id, Change: Breaking, Msg: "declaration removed", Pos: pos(bpkg.fset, bDecl), Before: bDecl}
 				changes = append(changes, c)
 				continue
 			}
@@ -293,7 +282,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 			// in before and in after, check if there's a difference
 			change, err := d.Check(bDecl, aDecl)
 			if err != nil {
-				return nil, &diffError{err: err, bdecl: bDecl, adecl: aDecl}
+				return nil, &diffError{pkg: pkgName, err: err, bdecl: bDecl, adecl: aDecl}
 			}
 
 			switch change.Change {
@@ -302,25 +291,24 @@ func (c Checker) compareDecls() ([]Change, error) {
 			}
 
 			changes = append(changes, Change{
-				Pkg:    pkg,
+				Pkg:    pkgName,
 				ID:     id,
 				Change: change.Change,
 				Msg:    change.Msg,
-				Pos:    pos(c.aFset, aDecl),
+				Pos:    pos(apkg.fset, aDecl),
 				Before: bDecl,
 				After:  aDecl,
 			})
 		}
 
-		for id, aDecl := range aDecls {
-			if _, ok := bDecls[id]; !ok {
+		for id, aDecl := range apkg.decls {
+			if _, ok := bpkg.decls[id]; !ok {
 				// in after, not in before, therefore it was added
-				c := Change{Pkg: pkg, ID: id, Change: NonBreaking, Msg: "declaration added", Pos: pos(c.aFset, aDecl), After: aDecl}
+				c := Change{Pkg: pkgName, ID: id, Change: NonBreaking, Msg: "declaration added", Pos: pos(apkg.fset, aDecl), After: aDecl}
 				changes = append(changes, c)
 			}
 		}
 	}
-
 	return changes, nil
 }
 
@@ -331,6 +319,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 // has always been valid, so just use that.
 //
 // TODO fixme, this function shouldn't be required for the above reason.
+// TODO actually we should just return the pos, leave it up to the app to figure it out
 func pos(fset *token.FileSet, decl ast.Decl) string {
 	p := decl.Pos()
 	if !p.IsValid() {
