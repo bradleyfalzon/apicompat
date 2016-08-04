@@ -5,22 +5,23 @@
 `abicheck` is a tool to check for the introduction of backwards incompatible changes.
 
 `abicheck`:
-- Guarantees that all consumers of a library will still be able to build without failures
+- Guarantees that all consumers of a library will still build without failure
 - Only checks exported declarations
 - There are no false positives (if there are, it's a bug)
 - Not every backwards incompatible change can be detected, swapping argument parameters and other changes still need to
-    be considered by the library author.
+    be considered by the library author
 - Can be simply consumed as a library
+- Is in its infancy, see [Status](#status), feedback and review appreciated
 
 Secondary tasks could include:
 - Detecting current semver and suggesting an appropriate increase
 - Listing all changes for help in writing release notes/commit messages.
 
-Try it:
+Try at [abicheck.bradleyf.id.au](https://abicheck.bradleyf.id.au/) or via CLI:
 
 ```
 go get -u github.com/bradleyfalzon/abicheck/cmd/abicheck
-cd /your/project/dir/with/comitted/changes
+cd /your/project/dir/with/committed/changes
 abicheck
 ```
 
