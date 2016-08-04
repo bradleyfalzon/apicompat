@@ -2,13 +2,19 @@
 
 [![Build Status](https://travis-ci.org/bradleyfalzon/abicheck.svg?branch=master)](https://travis-ci.org/bradleyfalzon/abicheck) [![Coverage Status](https://coveralls.io/repos/github/bradleyfalzon/abicheck/badge.svg?branch=master)](https://coveralls.io/github/bradleyfalzon/abicheck?branch=master) [![GoDoc](https://godoc.org/github.com/bradleyfalzon/abicheck?status.svg)](https://godoc.org/github.com/bradleyfalzon/abicheck)
 
-`abicheck` is a tool to check for the introduction of backwards incompatible changes. Specifically, it checks all
-exported declarations for changes which would cause a consumer of the package to have build failures. For example, it
-will alert if a function's parameter types change, but not if the purpose of those parameters change (e.g. the
-parameters are swapped but the type stays the same).
+`abicheck` is a tool to check for the introduction of backwards incompatible changes.
 
-Secondary tasks could be detecting current semver and suggesting an appropriate increase, and generally listing all changes
-for help in release notes/commit messages.
+`abicheck`:
+- Guarantees that all consumers of a library will still be able to build without failures
+- Only checks exported declarations
+- There are no false positives (if there are, it's a bug)
+- Not every backwards incompatible change can be detected, swapping argument parameters and other changes still need to
+    be considered by the library author.
+- Can be simply consumed as a library
+
+Secondary tasks could include:
+- Detecting current semver and suggesting an appropriate increase
+- Listing all changes for help in writing release notes/commit messages.
 
 Try it:
 
@@ -43,8 +49,6 @@ release notes.
 - Add type checking to analyse inferred types
 - Choosing of import paths as the first argument, similar to other tools (no argument means just current directory, else
     support `./...` and specifying)
-- Investigate additional interface checks (e.g., currently renaming an interface with the same methods would be detected as
-    a breaking change, this isn't always true)
 - Adding Mercurial, SVN and potentially other VCS systems
 - Improve VCS options such as:
     - Detection of VCS and flag to overwrite
