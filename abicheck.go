@@ -150,29 +150,40 @@ func pkgDecls(decls map[string]ast.Decl, astDecls []ast.Decl) {
 	for _, astDecl := range astDecls {
 		switch d := astDecl.(type) {
 		case *ast.GenDecl:
+			// split declaration blocks into individual declarations to view
+			// only changed declarations, instead of all, I don't imagine it's needed
+			// for TypeSpec (just ValueSpec), it does this by creating a new GenDecl
+			// with just that loops spec
 			for i := range d.Specs {
-				var (
-					id string
-					// gdecl splits declaration blocks into individual declarations to view
-					// only changed declarations, instead of all, I don't imagine it's needed
-					// for TypeSpec (just ValueSpec
-					gdecl *ast.GenDecl
-				)
 				switch s := d.Specs[i].(type) {
 				case *ast.ValueSpec:
 					// var / const
-					id = s.Names[0].Name
-					gdecl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
+					// split multi assignments into individial declarations to simplify matching
+					for j := range s.Names {
+						id := s.Names[j].Name
+						spec := &ast.ValueSpec{
+							Doc:     s.Doc,
+							Names:   []*ast.Ident{s.Names[j]},
+							Type:    s.Type,
+							Comment: s.Comment,
+						}
+						if len(s.Values)-1 >= j {
+							// Check j is not nil
+							spec.Values = []ast.Expr{s.Values[j]}
+						}
+						if ast.IsExported(id) {
+							decls[id] = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{spec}}
+						}
+					}
 				case *ast.TypeSpec:
 					// type struct/interface/etc
-					id = s.Name.Name
-					gdecl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
+					id := s.Name.Name
+					if ast.IsExported(id) {
+						decls[id] = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
+					}
 				default:
 					// import or possibly other
 					continue
-				}
-				if ast.IsExported(id) {
-					decls[id] = gdecl
 				}
 			}
 		case *ast.FuncDecl:
