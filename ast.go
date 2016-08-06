@@ -62,68 +62,22 @@ func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
 
 		switch bspec := b.Specs[0].(type) {
 		case *ast.ValueSpec:
+			// var / const
 			aspec := a.Specs[0].(*ast.ValueSpec)
 
-			if bspec.Type == nil || aspec.Type == nil {
-				// eg: var ErrSomeError = errors.New("Some Error")
-				// cannot currently determine the type
+			btype := c.binfo.ObjectOf(bspec.Names[0])
+			atype := c.ainfo.ObjectOf(aspec.Names[0])
 
-				return unknown("cannot currently determine type")
-			}
-
-			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
-				// eg change from int to []int
-				return breaking("changed value spec type")
-			}
-
-			// var / const
-			switch btype := bspec.Type.(type) {
-			case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
-				// int/string/etc or bytes.Buffer/etc or *int/*bytes.Buffer/etc
-				if c.binfo.TypeOf(bspec.Type) != c.ainfo.TypeOf(aspec.Type) {
-					// type changed
+			if !types.Identical(btype.Type(), atype.Type()) {
+				// Inferred types from external packages (inc. stdlib) aren't identical
+				// according to types.Identical(), so compare the string representations
+				if btype.String() != atype.String() {
 					return breaking("changed type")
 				}
-			case *ast.ArrayType:
-				// slice/array
-				atype := aspec.Type.(*ast.ArrayType)
-				if !c.exprEqual(btype, atype) {
-					// change of length, or between array and slice or type
-					return breaking("changed array/slice's length or type")
-				}
-			case *ast.MapType:
-				// map
-				atype := aspec.Type.(*ast.MapType)
-
-				if !c.exprEqual(btype.Key, atype.Key) {
-					return breaking("changed map's key's type")
-				}
-				if !c.exprEqual(btype.Value, atype.Value) {
-					return breaking("changed map's value's type")
-				}
-			case *ast.InterfaceType:
-				// this is a special case for just interface{}
-				atype := aspec.Type.(*ast.InterfaceType)
-				return c.checkInterface(btype, atype)
-			case *ast.ChanType:
-				// channel
-				atype := aspec.Type.(*ast.ChanType)
-				return c.checkChan(btype, atype)
-			case *ast.FuncType:
-				// func
-				atype := aspec.Type.(*ast.FuncType)
-				return c.checkFunc(btype, atype)
-			case *ast.StructType:
-				// anonymous struct
-				atype := aspec.Type.(*ast.StructType)
-				return c.checkStruct(btype, atype)
-			default:
-				return nil, fmt.Errorf("unknown val spec type: %T", btype)
 			}
 		case *ast.TypeSpec:
-			aspec := a.Specs[0].(*ast.TypeSpec)
-
 			// type struct/interface/aliased
+			aspec := a.Specs[0].(*ast.TypeSpec)
 
 			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
 				// Spec change, such as from StructType to InterfaceType or different aliased types

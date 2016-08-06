@@ -2,6 +2,7 @@ package library
 
 import (
 	"bytes"
+	"errors"
 	"io"
 )
 
@@ -27,8 +28,9 @@ const GenDeclSpecChange int = 1
 // ConstChangeType detects a change of type for a constant
 const ConstChangeType int = 0
 
-// ValDynamicType checks for (lack of) support types parser can't easily detect
-var ValDynamicType = bytes.NewBufferString("some error")
+// ValInferredType checks for support for inferred types
+var ValInferredTypeBuiltIn = errors.New("some error")
+var ValInferredTypePackage = bytes.NewBufferString("some error")
 
 // ValChangeType detects a change of type for a constant
 var VarChangeType int
@@ -48,7 +50,7 @@ var VarChangeTypeChan chan int
 // VarChangeTypeChanDirection detects changes in chan direction
 var VarChangeTypeChanDir chan int
 
-// VarChangeTypeChanDirection detects removing chan direction (this is ok)
+// VarChangeTypeChanDirection detects removing chan direction
 var VarChangeTypeChanDirRelax <-chan int
 
 // VarChangeTypeFunc detects support for var funcs
@@ -63,7 +65,7 @@ var VarChangeTypeFuncParam func(int) error
 // VarChangeTypeFuncResult detects a change in a func's return list
 var VarChangeTypeFuncResult func(int) error
 
-// VarAddTypeFuncResult detects an add in a func's return list (this is ok)
+// VarAddTypeFuncResult detects an add in a func's return list
 var VarAddTypeFuncResult func(int)
 
 // VarRemoveTypeFuncResult detects a removal in a func's return list
