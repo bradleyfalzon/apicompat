@@ -47,7 +47,6 @@ release notes.
 
 `abicheck` is currently under heavy development and refactoring. This initial version was a proof of concept and shortcuts were taken. The current tasks are focused on (but not limited to):
 
-- Add type checking to analyse inferred types
 - Choosing of import paths as the first argument, similar to other tools (no argument means just current directory, else
     support `./...` and specifying)
 - Adding Mercurial, SVN and potentially other VCS systems
