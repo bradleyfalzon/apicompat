@@ -19,14 +19,10 @@ import (
 type Checker struct {
 	vcs  VCS
 	vlog io.Writer
-	b    map[string]pkg
-	a    map[string]pkg
 
+	b   map[string]pkg
+	a   map[string]pkg
 	err error
-
-	parseTime time.Duration
-	diffTime  time.Duration
-	sortTime  time.Duration
 }
 
 // TODO New returns a Checker with
@@ -58,7 +54,7 @@ func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
 	start := time.Now()
 	c.b = c.parse(beforeRev)
 	c.a = c.parse(afterRev)
-	c.parseTime = time.Since(start)
+	parse := time.Since(start)
 
 	if c.err != nil {
 		// Error parsing, don't continue
@@ -76,16 +72,14 @@ func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
 		}
 		return nil, errors.New(buf.String())
 	}
-	c.diffTime += time.Since(start)
+	diff := time.Since(start)
 
 	start = time.Now()
 	sort.Sort(byID(changes))
-	c.sortTime += time.Since(start)
+	sort := time.Since(start)
 
-	c.logf("Parse time: %v, Diff time: %v, Sort time: %v, Total time: %v\n",
-		c.parseTime, c.diffTime, c.sortTime, c.parseTime+c.diffTime+c.sortTime)
-
-	c.logf("%v changes detected\n", len(changes))
+	c.logf("Timing: parse: %v, diff: %v, sort: %v, total: %v\n", parse, diff, sort, parse+diff+sort)
+	c.logf("Changes detected: %v\n", len(changes))
 
 	return changes, nil
 }
