@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	tmpl "text/template"
+	tmplX "text/template"
 )
 
 // ConstMultiSpec* checks support for multiple specs
@@ -27,6 +29,13 @@ const GenDeclSpecChange int = 1
 
 // ConstChangeType detects a change of type for a constant
 const ConstChangeType int = 0
+
+// AliasedImport checks for support for aliases imports
+var AliasedImportChange tmpl.Template
+var AliasedImportRename tmplX.Template
+
+type AliasedImportChangeS struct{ T tmpl.Template }
+type AliasedImportRenameS struct{ T tmplX.Template }
 
 // ValInferredType checks for support for inferred types
 var ValInferredType = "string"

@@ -373,7 +373,11 @@ func (c DeclChecker) exprEqual(before, after ast.Expr) bool {
 	// though comparing the type itself is. This applies to any non-built
 	// in type, such as bytes.Buffer, *bytes.Buffer etc
 	// https://play.golang.org/p/t6P5Uz6fIa
-	return types.ExprString(before) == types.ExprString(after)
+	//
+	// Also compare types with types.TypeString to ignore any import aliases
+	btype := c.binfo.TypeOf(before)
+	atype := c.ainfo.TypeOf(after)
+	return types.TypeString(btype, nil) == types.TypeString(atype, nil)
 }
 
 // exprInterfaceType returns a *ast.InterfaceType given an interface type using

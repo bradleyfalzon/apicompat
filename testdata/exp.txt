@@ -1,3 +1,9 @@
+rev2:abitest.go:-: breaking change changed type
+	var AliasedImportChange tmpl.Template
+	var AliasedImportChange tmpl.Template
+rev2:abitest.go:-: breaking change members changed types
+	type AliasedImportChangeS struct{ T tmpl.Template }
+	type AliasedImportChangeS struct{ T tmpl.Template }
 rev2:abitest.go:-: non-breaking change declaration added
 	const ConstAdded int = 0
 rev2:abitest.go:-: breaking change changed type
