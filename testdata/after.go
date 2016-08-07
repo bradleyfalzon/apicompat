@@ -151,6 +151,12 @@ type TypeAlias uint
 // FuncRetEmptyFunc tests handling of a func return bare func
 func FuncRetEmptyFunc() func()
 
+// FuncArg tests handing of function args that don't change
+func FuncArg(arg1 int)                 {}
+func FuncArgPtr(arg1 *int)             {}
+func FuncArgPkg(arg1 bytes.Buffer)     {}
+func FuncArgPtrPkg(arg1 *bytes.Buffer) {}
+
 // FuncRenameArg tests ignorance of changes in variable names
 func FuncRenameArg(arg2 int) (ret2 error) {}
 
