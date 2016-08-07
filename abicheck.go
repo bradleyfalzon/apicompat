@@ -10,6 +10,7 @@ import (
 	"go/printer"
 	"go/token"
 	"go/types"
+	"io"
 	"sort"
 	"time"
 )
@@ -17,6 +18,7 @@ import (
 // Checker is used to check for changes between two versions of a package.
 type Checker struct {
 	vcs   VCS
+	vlog  io.Writer
 	bName string
 	aName string
 	b     map[string]pkg
@@ -44,6 +46,12 @@ func New(options ...func(*Checker)) *Checker {
 func SetVCS(vcs VCS) func(*Checker) {
 	return func(c *Checker) {
 		c.vcs = vcs
+	}
+}
+
+func SetVLog(w io.Writer) func(*Checker) {
+	return func(c *Checker) {
+		c.vlog = w
 	}
 }
 
@@ -76,7 +84,18 @@ func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
 	sort.Sort(byID(changes))
 	c.sortTime += time.Since(start)
 
+	c.logf("Parse time: %v, Diff time: %v, Sort time: %v, Total time: %v\n",
+		c.parseTime, c.diffTime, c.sortTime, c.parseTime+c.diffTime+c.sortTime)
+
+	c.logf("%v changes detected\n", len(changes))
+
 	return changes, nil
+}
+
+func (c Checker) logf(format string, a ...interface{}) {
+	if c.vlog != nil {
+		fmt.Fprintf(c.vlog, format, a...)
+	}
 }
 
 type pkg struct {
@@ -214,11 +233,6 @@ func pkgDecls(decls map[string]ast.Decl, astDecls []ast.Decl) {
 			panic(fmt.Errorf("Unknown decl type: %#v", astDecl))
 		}
 	}
-}
-
-// Timing returns individual phase timing information
-func (c Checker) Timing() (parseTime, diffTime, sortTime time.Duration) {
-	return c.parseTime, c.diffTime, c.sortTime
 }
 
 // change is the ast declaration containing the before and after
