@@ -65,7 +65,7 @@ func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
 	changes, err := c.compareDecls()
 	if err != nil {
 		var buf bytes.Buffer
-		fmt.Fprintf(&buf, "error processing diff: %s", err)
+		fmt.Fprintf(&buf, "error comparing declarations: %s\n", err)
 		if derr, ok := err.(*diffError); ok {
 			_ = ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
 			_ = ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)

@@ -384,20 +384,17 @@ func (c DeclChecker) exprEqual(before, after ast.Expr) bool {
 // the worst possible method. It's used to determine whether two interfaces
 // are compatible based on function parameters/results.
 func exprInterfaceType(uses map[*ast.Ident]types.Object, expr ast.Expr) (*ast.InterfaceType, error) {
-	var (
-		pkg string
-		sel *ast.Ident
-	)
+	var sel *ast.Ident
 	switch etype := expr.(type) {
 	case *ast.StarExpr:
 		switch estar := etype.X.(type) {
 		case *ast.SelectorExpr:
-			pkg, sel = estar.X.(*ast.Ident).String(), estar.Sel
+			sel = estar.Sel
 		case *ast.Ident:
 			sel = estar
 		}
 	case *ast.SelectorExpr:
-		pkg, sel = etype.X.(*ast.Ident).String(), etype.Sel
+		sel = etype.Sel
 	case *ast.Ident:
 		sel = etype
 	default:
@@ -409,14 +406,19 @@ func exprInterfaceType(uses map[*ast.Ident]types.Object, expr ast.Expr) (*ast.In
 		return nil, errors.New("could not find interface in uses")
 	}
 
-	// use is: *types.TypeName, string: type io.Writer interface{Write(p []byte) (n int, err error)}
+	// obj is: *types.TypeName, string: type io.Writer interface{Write(p []byte) (n int, err error)}
 
-	// Remove the package name from the source in order to parse valid program
-	src := strings.Replace(obj.String(), fmt.Sprintf("type %s.", pkg), "type ", 1)
+	// Remove the package name from the source in order to parse valid program,
+	// this could be io (for io.Writer) or golang.org/x/net/context, if it's in
+	// universe scope, it's nil
+	src := obj.String()
+	if obj.Pkg() != nil {
+		src = strings.Replace(src, fmt.Sprintf("type %s.", obj.Pkg().Path()), "type ", 1)
+	}
 	src = fmt.Sprintf("package expr\n%s", src)
 
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, pkg, src, 0)
+	file, err := parser.ParseFile(fset, "", src, 0)
 	if err != nil {
 		return nil, fmt.Errorf("%s parsing: %s", err, src)
 	}
