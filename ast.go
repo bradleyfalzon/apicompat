@@ -142,6 +142,7 @@ func (c DeclChecker) checkInterface(before, after *ast.InterfaceType) (*DeclChan
 func (c DeclChecker) checkStruct(before, after *ast.StructType) (*DeclChange, error) {
 	// structs don't care if fields were added
 	r := c.diffFields(before.Fields.List, after.Fields.List)
+	r.RemoveUnexported()
 	if r.Removed() {
 		// Fields were removed
 		return breaking("members removed")
@@ -265,13 +266,29 @@ func (d *diffResult) RemoveInterfaceCompatible(chkr DeclChecker) (msg string, er
 			}
 		}
 	}
+	d.removeModified(compatible)
+	return msg, nil
+}
 
+func (d *diffResult) RemoveUnexported() (msg string, err error) {
+	var unexported []int
+	for i, mod := range d.modified {
+		bident := mod[0].Names
+		if !ast.IsExported(bident[0].Name) {
+			unexported = append(unexported, i)
+		}
+	}
+	d.removeModified(unexported)
+	return msg, nil
+}
+
+func (d *diffResult) removeModified(rm []int) {
 	// TODO cleanup
 	modified := [][2]*ast.Field{}
 	for i := range d.modified {
 		var keep bool = true
-		for c := range compatible {
-			if c == i {
+		for r := range rm {
+			if r == i {
 				keep = false
 			}
 		}
@@ -280,7 +297,6 @@ func (d *diffResult) RemoveInterfaceCompatible(chkr DeclChecker) (msg string, er
 		}
 	}
 	d.modified = modified
-	return msg, nil
 }
 
 // stripNames strips the names from a fieldlist, which is usually a function's

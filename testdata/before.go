@@ -128,6 +128,11 @@ type StructChangeMember struct {
 	Member1 int
 }
 
+// StructChangePrivMember tests for ignorance in changes in private members
+type StructChangePrivMember struct {
+	private int
+}
+
 // IfaceAddMember detects additions of interface methods
 type IfaceAddMember interface {
 	//Member1 will be added
