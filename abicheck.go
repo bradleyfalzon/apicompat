@@ -17,12 +17,10 @@ import (
 
 // Checker is used to check for changes between two versions of a package.
 type Checker struct {
-	vcs   VCS
-	vlog  io.Writer
-	bName string
-	aName string
-	b     map[string]pkg
-	a     map[string]pkg
+	vcs  VCS
+	vlog io.Writer
+	b    map[string]pkg
+	a    map[string]pkg
 
 	err error
 
@@ -73,8 +71,8 @@ func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "error processing diff: %s", err)
 		if derr, ok := err.(*diffError); ok {
-			ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
-			ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)
+			_ = ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
+			_ = ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)
 		}
 		return nil, errors.New(buf.String())
 	}
@@ -135,7 +133,7 @@ func (c *Checker) parse(rev string) map[string]pkg {
 
 	pkgs := make(map[string]pkg)
 	for pkgName, files := range pkgFiles {
-		pkg := pkg{
+		p := pkg{
 			fset:  fset,
 			decls: make(map[string]ast.Decl),
 			info: &types.Info{
@@ -146,7 +144,7 @@ func (c *Checker) parse(rev string) map[string]pkg {
 		}
 
 		for _, file := range files {
-			pkgDecls(pkg.decls, file.Decls)
+			pkgDecls(p.decls, file.Decls)
 		}
 
 		conf := &types.Config{
@@ -154,13 +152,13 @@ func (c *Checker) parse(rev string) map[string]pkg {
 			DisableUnusedImportCheck: true,
 			Importer:                 importer.Default(),
 		}
-		_, err := conf.Check("", fset, files, pkg.info)
+		_, err := conf.Check("", fset, files, p.info)
 		if err != nil {
 			c.err = err
 			return nil
 		}
 
-		pkgs[pkgName] = pkg
+		pkgs[pkgName] = p
 	}
 	return pkgs
 }
@@ -254,11 +252,11 @@ func (c Change) String() string {
 	fmt.Fprintf(&buf, "%s: %s %s\n", c.Pos, c.Change, c.Msg)
 
 	if c.Before != nil {
-		pcfg.Fprint(&buf, &fset, c.Before)
+		_ = pcfg.Fprint(&buf, &fset, c.Before)
 		fmt.Fprintln(&buf)
 	}
 	if c.After != nil {
-		pcfg.Fprint(&buf, &fset, c.After)
+		_ = pcfg.Fprint(&buf, &fset, c.After)
 		fmt.Fprintln(&buf)
 	}
 	return buf.String()
@@ -276,8 +274,6 @@ type diffError struct {
 	pkg string
 	bdecl,
 	adecl ast.Decl
-	bpos,
-	apos token.Pos
 }
 
 func (e diffError) Error() string {
@@ -310,8 +306,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 				return nil, &diffError{pkg: pkgName, err: err, bdecl: bDecl, adecl: aDecl}
 			}
 
-			switch change.Change {
-			case None, Unknown:
+			if change.Change == None {
 				continue
 			}
 

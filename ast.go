@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	Unknown     = "unknown change"
 	None        = "no change"
 	NonBreaking = "non-breaking change"
 	Breaking    = "breaking change"
@@ -35,7 +34,6 @@ func NewDeclChecker(bi, ai *types.Info) *DeclChecker {
 
 func nonBreaking(msg string) (*DeclChange, error) { return &DeclChange{NonBreaking, msg}, nil }
 func breaking(msg string) (*DeclChange, error)    { return &DeclChange{Breaking, msg}, nil }
-func unknown(msg string) (*DeclChange, error)     { return &DeclChange{Unknown, msg}, nil }
 func none() (*DeclChange, error)                  { return &DeclChange{None, ""}, nil }
 
 // equal compares two declarations and returns true if they do not have
@@ -343,7 +341,7 @@ func fieldKey(field *ast.Field, i int) string {
 		return field.Names[0].Name
 	}
 	// No name, probably a function, return position
-	return strconv.FormatInt(int64(i), 10)
+	return strconv.Itoa(i)
 }
 
 // exprEqual compares two ast.Expr to determine if they are equal

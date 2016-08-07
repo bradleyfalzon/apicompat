@@ -44,7 +44,7 @@ func TestParse(t *testing.T) {
 
 	// Overwrite the gold master with go test -args update
 	if len(os.Args) > 1 && os.Args[1] == "update" {
-		err := ioutil.WriteFile("testdata/exp.txt", buf.Bytes(), os.FileMode(0644))
+		err = ioutil.WriteFile("testdata/exp.txt", buf.Bytes(), os.FileMode(0644))
 		if err != nil {
 			t.Fatal("could not write exp data:", err)
 		}
