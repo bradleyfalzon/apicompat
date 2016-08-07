@@ -104,6 +104,14 @@ var VarChangeTypeStarSelector *bytes.Reader
 // TypeSpecChange detects a change between types specs
 type TypeSpecChange interface{}
 
+// Struct checks for support of struct fields
+type Struct struct{ A int }
+type StructPtr struct{ A *int }
+type StructPkg struct{ A bytes.Buffer }
+type StructPtrPkg struct{ A *bytes.Buffer }
+type StructMapPkg struct{ A map[int]bytes.Buffer }
+type StructMapPtrPkg struct{ A map[int]*bytes.Buffer }
+
 // StructAddMember detects additions of struct fields (is not a problem)
 type StructAddMember struct {
 	Member1 int
@@ -152,10 +160,11 @@ type TypeAlias uint
 func FuncRetEmptyFunc() func()
 
 // FuncArg tests handing of function args that don't change
-func FuncArg(arg1 int)                 {}
-func FuncArgPtr(arg1 *int)             {}
-func FuncArgPkg(arg1 bytes.Buffer)     {}
-func FuncArgPtrPkg(arg1 *bytes.Buffer) {}
+func FuncArg(arg1 int)                    {}
+func FuncArgPtr(arg1 *int)                {}
+func FuncArgPkg(arg1 bytes.Buffer)        {}
+func FuncArgPtrPkg(arg1 *bytes.Buffer)    {}
+func FuncArgFuncPkg(func(A bytes.Buffer)) {}
 
 // FuncRenameArg tests ignorance of changes in variable names
 func FuncRenameArg(arg2 int) (ret2 error) {}

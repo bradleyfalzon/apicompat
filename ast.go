@@ -352,21 +352,22 @@ func (c DeclChecker) exprEqual(before, after ast.Expr) bool {
 		return false
 	}
 
-	switch btype := before.(type) {
+	switch before.(type) {
 	case *ast.ChanType:
-		atype := after.(*ast.ChanType)
-		change, _ := c.checkChan(btype, atype)
+		change, _ := c.checkChan(before.(*ast.ChanType), after.(*ast.ChanType))
 		return change.Change != Breaking
-	case *ast.Ident:
-		// types.Identical returns false for any custom types when comparing
-		// the results from two different type checkers. So, just compare by
-		// name. Eg, func (_ CustomType) {}, CustomType is not identical, even
-		// though comparing the type itself is.
-		// https://play.golang.org/p/t6P5Uz6fIa
-		return types.ExprString(before) == types.ExprString(after)
+	case *ast.FuncType:
+		change, _ := c.checkFunc(before.(*ast.FuncType), after.(*ast.FuncType))
+		return change.Change != Breaking
 	}
 
-	return types.Identical(c.binfo.TypeOf(before), c.ainfo.TypeOf(after))
+	// types.Identical returns false for any custom types when comparing
+	// the results from two different type checkers. So, just compare by
+	// name. Eg, func (_ CustomType) {}, CustomType is not identical, even
+	// though comparing the type itself is. This applies to any non-built
+	// in type, such as bytes.Buffer, *bytes.Buffer etc
+	// https://play.golang.org/p/t6P5Uz6fIa
+	return types.ExprString(before) == types.ExprString(after)
 }
 
 // exprInterfaceType returns a *ast.InterfaceType given an interface type using
