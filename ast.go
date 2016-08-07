@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"go/types"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -282,21 +283,12 @@ func (d *diffResult) RemoveUnexported() (msg string, err error) {
 	return msg, nil
 }
 
-func (d *diffResult) removeModified(rm []int) {
-	// TODO cleanup
-	modified := [][2]*ast.Field{}
-	for i := range d.modified {
-		var keep bool = true
-		for r := range rm {
-			if r == i {
-				keep = false
-			}
-		}
-		if keep {
-			modified = append(modified, d.modified[i])
-		}
+func (d *diffResult) removeModified(rmi []int) {
+	sort.Ints(rmi)
+	for rm := len(rmi) - 1; rm >= 0; rm-- {
+		i := rmi[rm]
+		d.modified = append(d.modified[:i], d.modified[i+1:]...)
 	}
-	d.modified = modified
 }
 
 // stripNames strips the names from a fieldlist, which is usually a function's
