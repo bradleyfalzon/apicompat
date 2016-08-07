@@ -215,7 +215,7 @@ func pkgDecls(decls map[string]ast.Decl, astDecls []ast.Decl) {
 				id = recv + "." + id
 			}
 			// If it's exported and it's either not a receiver OR the receiver is also exported
-			if ast.IsExported(id) && recv == "" || ast.IsExported(recv) {
+			if ast.IsExported(d.Name.Name) && (recv == "" || ast.IsExported(recv)) {
 				// We're not interested in the body, nil it, alternatively we could set an
 				// Body.List, but that included parenthesis on different lines when printed
 				astDecl.(*ast.FuncDecl).Body = nil

@@ -220,6 +220,7 @@ type FuncRecv struct{}
 
 func (_ *FuncRecv) Method1(arg1 bool) (ret1 int) { return 1 }
 func (_ FuncRecv) Method2(arg1 bool) (ret1 int)  { return 1 }
+func (_ FuncRecv) method3(arg1 bool) (ret1 int)  { return 1 }
 
 // FuncAddVariadic detects addition of a variadic argument to a function (is not a problem)
 func FuncAddVariadic(_ ...int) {}
