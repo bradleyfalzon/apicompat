@@ -258,3 +258,10 @@ type C1 int
 
 // FuncCustomType tests for support of comparing custom types
 func FuncCustomType(_ C1) {}
+
+// PrivateReturned detects changes in unexported, but returned types
+type s struct{ Member int }
+
+func F1() s      { return s{} }
+func F2() *s     { return &s{} }
+func (s) F() int { return 0 }

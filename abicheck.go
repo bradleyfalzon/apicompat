@@ -128,8 +128,7 @@ func (c *Checker) parse(rev string) map[string]pkg {
 	pkgs := make(map[string]pkg)
 	for pkgName, files := range pkgFiles {
 		p := pkg{
-			fset:  fset,
-			decls: make(map[string]ast.Decl),
+			fset: fset,
 			info: &types.Info{
 				Types: make(map[ast.Expr]types.TypeAndValue),
 				Defs:  make(map[*ast.Ident]types.Object),
@@ -137,9 +136,7 @@ func (c *Checker) parse(rev string) map[string]pkg {
 			},
 		}
 
-		for _, file := range files {
-			pkgDecls(p.decls, file.Decls)
-		}
+		p.decls = pkgDecls(files)
 
 		conf := &types.Config{
 			IgnoreFuncBodies:         true,
@@ -157,74 +154,134 @@ func (c *Checker) parse(rev string) map[string]pkg {
 	return pkgs
 }
 
-func pkgDecls(decls map[string]ast.Decl, astDecls []ast.Decl) {
-	for _, astDecl := range astDecls {
-		switch d := astDecl.(type) {
-		case *ast.GenDecl:
-			// split declaration blocks into individual declarations to view
-			// only changed declarations, instead of all, I don't imagine it's needed
-			// for TypeSpec (just ValueSpec), it does this by creating a new GenDecl
-			// with just that loops spec
-			for i := range d.Specs {
-				switch s := d.Specs[i].(type) {
-				case *ast.ValueSpec:
-					// var / const
-					// split multi assignments into individial declarations to simplify matching
-					for j := range s.Names {
-						id := s.Names[j].Name
-						spec := &ast.ValueSpec{
-							Doc:     s.Doc,
-							Names:   []*ast.Ident{s.Names[j]},
-							Type:    s.Type,
-							Comment: s.Comment,
+// pkgDecls returns all declarations that need to be checked, this includes
+// all exported declarations as well as unexported types that are returned by
+// exported functions. Structs have both exported and unexported fields.
+func pkgDecls(files []*ast.File) map[string]ast.Decl {
+	var (
+		// exported values and functions
+		decls = make(map[string]ast.Decl)
+
+		// unexported values and functions
+		priv = make(map[string]ast.Decl)
+
+		// IDs of ValSpecs that are returned by a function
+		returned []string
+	)
+	for _, file := range files {
+		for _, astDecl := range file.Decls {
+			switch d := astDecl.(type) {
+			case *ast.GenDecl:
+				// split declaration blocks into individual declarations to view
+				// only changed declarations, instead of all, I don't imagine it's needed
+				// for TypeSpec (just ValueSpec), it does this by creating a new GenDecl
+				// with just that loops spec
+				for i := range d.Specs {
+					var (
+						id   string
+						decl *ast.GenDecl
+					)
+					switch s := d.Specs[i].(type) {
+					case *ast.ValueSpec:
+						// var / const
+						// split multi assignments into individial declarations to simplify matching
+						for j := range s.Names {
+							id = s.Names[j].Name
+							spec := &ast.ValueSpec{
+								Doc:     s.Doc,
+								Names:   []*ast.Ident{s.Names[j]},
+								Type:    s.Type,
+								Comment: s.Comment,
+							}
+							if len(s.Values)-1 >= j {
+								// Check j is not nil
+								spec.Values = []ast.Expr{s.Values[j]}
+							}
+							decl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{spec}}
 						}
-						if len(s.Values)-1 >= j {
-							// Check j is not nil
-							spec.Values = []ast.Expr{s.Values[j]}
-						}
-						if ast.IsExported(id) {
-							decls[id] = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{spec}}
-						}
+					case *ast.TypeSpec:
+						// type struct/interface/etc
+						id = s.Name.Name
+						decl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
+					case *ast.ImportSpec:
+						// ignore
+						continue
+					default:
+						panic(fmt.Errorf("Unknown declaration: %#v", s))
 					}
-				case *ast.TypeSpec:
-					// type struct/interface/etc
-					id := s.Name.Name
 					if ast.IsExported(id) {
-						decls[id] = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
+						decls[id] = decl
+						continue
 					}
-				default:
-					// import or possibly other
-					continue
+					priv[id] = decl
 				}
-			}
-		case *ast.FuncDecl:
-			// function or method
-			var (
-				id   string = d.Name.Name
-				recv string
-			)
-			// check if we have a receiver (and not just `func () Method() {}`)
-			if d.Recv != nil && len(d.Recv.List) > 0 {
-				expr := d.Recv.List[0].Type
-				switch e := expr.(type) {
-				case *ast.Ident:
-					recv = e.Name
-				case *ast.StarExpr:
-					recv = e.X.(*ast.Ident).Name
+			case *ast.FuncDecl:
+				// function or method
+				var (
+					id   string = d.Name.Name
+					recv string
+				)
+				// check if we have a receiver (and not just `func () Method() {}`)
+				if d.Recv != nil && len(d.Recv.List) > 0 {
+					expr := d.Recv.List[0].Type
+					switch e := expr.(type) {
+					case *ast.Ident:
+						recv = e.Name
+					case *ast.StarExpr:
+						recv = e.X.(*ast.Ident).Name
+					}
+					id = recv + "." + id
 				}
-				id = recv + "." + id
-			}
-			// If it's exported and it's either not a receiver OR the receiver is also exported
-			if ast.IsExported(d.Name.Name) && (recv == "" || ast.IsExported(recv)) {
-				// We're not interested in the body, nil it, alternatively we could set an
-				// Body.List, but that included parenthesis on different lines when printed
 				astDecl.(*ast.FuncDecl).Body = nil
-				decls[id] = astDecl
+				// If it's exported and it's either not a receiver OR the receiver is also exported
+				if ast.IsExported(d.Name.Name) && (recv == "" || ast.IsExported(recv)) {
+					// We're not interested in the body, nil it, alternatively we could set an
+					// Body.List, but that included parenthesis on different lines when printed
+					decls[id] = astDecl
+
+					// note which ident types are returned, to find those that were not
+					// exported but are returned and therefor need to be checked
+					if d.Type.Results != nil {
+						for _, field := range d.Type.Results.List {
+							switch ftype := field.Type.(type) {
+							case *ast.Ident:
+								returned = append(returned, ftype.String())
+							case *ast.StarExpr:
+								if ident, ok := ftype.X.(*ast.Ident); ok {
+									returned = append(returned, ident.String())
+								}
+							}
+						}
+					}
+				} else {
+					priv[id] = astDecl
+				}
+			default:
+				panic(fmt.Errorf("Unknown decl type: %#v", astDecl))
 			}
-		default:
-			panic(fmt.Errorf("Unknown decl type: %#v", astDecl))
 		}
 	}
+
+	// Add any value specs returned by a function, but wasn't exported
+	for _, id := range returned {
+		// Find unexported types that need to be checked
+		if _, ok := priv[id]; ok {
+			decls[id] = priv[id]
+		}
+
+		// Find exported functions with unexported receivers that also need to be checked
+		for rid, decl := range priv {
+			// len(type)+1 to account for dot separator
+			if len(rid) <= len(id)+1 {
+				continue
+			}
+			pid, pfunc := rid[:len(id)], rid[len(id)+1:]
+			if id == pid && ast.IsExported(pfunc) {
+				decls[rid] = decl
+			}
+		}
+	}
+	return decls
 }
 
 // change is the ast declaration containing the before and after

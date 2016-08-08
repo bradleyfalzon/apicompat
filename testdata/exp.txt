@@ -178,3 +178,9 @@ rev2:abitest.go:-: breaking change changed type
 rev2:abitest.go:-: breaking change changed type
 	var VarRemoveTypeFuncResult func(int) error
 	var VarRemoveTypeFuncResult func(int)
+rev2:abitest.go:-: breaking change members changed types
+	type s struct{ Member int }
+	type s struct{ Member uint }
+rev2:abitest.go:-: breaking change return parameters changed
+	func (s) F() int
+	func (s) F() uint
