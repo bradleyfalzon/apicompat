@@ -29,7 +29,7 @@ func TestParse(t *testing.T) {
 	// Run checks
 	c := New(SetVCS(vcs))
 
-	changes, err := c.Check("rev1", "rev2")
+	changes, err := c.Check("", "rev1", "rev2")
 	if err != nil {
 		t.Fatal(err)
 	}
