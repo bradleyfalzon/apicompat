@@ -160,8 +160,7 @@ func (c *Checker) parse(rev string) map[string]pkg {
 			return nil
 		}
 
-		pkgName := src.Name.Name
-		pkgFiles[pkgName] = append(pkgFiles[pkgName], src)
+		pkgFiles[ipkg.ImportPath] = append(pkgFiles[ipkg.ImportPath], src)
 	}
 
 	// Loop through all the parsed files and type check them
