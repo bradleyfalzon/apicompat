@@ -9,22 +9,18 @@ import (
 )
 
 func main() {
-	const (
-		oldRev = "HEAD~1"
-		newRev = "HEAD"
-	)
-
+	before := flag.String("before", "", "Compare revision before, leave unset for the VCS default or . to bypass VCS and use filesystem version")
+	after := flag.String("after", "", "Compare revision after, leave unset for the VCS default or . to bypass VCS and use filesystem version")
 	verbose := flag.Bool("v", false, "Enable verbose logging")
 	flag.Parse()
 
-	var checker *abicheck.Checker
+	var args []func(*abicheck.Checker)
 	if *verbose {
-		checker = abicheck.New(abicheck.SetVLog(os.Stdout))
-	} else {
-		checker = abicheck.New()
+		args = append(args, abicheck.SetVLog(os.Stdout))
 	}
 
-	changes, err := checker.Check(oldRev, newRev)
+	checker := abicheck.New(args...)
+	changes, err := checker.Check(*before, *after)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "abicheck: %s\n", err)
 		os.Exit(1)

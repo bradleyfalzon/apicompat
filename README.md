@@ -31,10 +31,11 @@ abicheck
 and arguments for the command line tool.
 
 ```
--vcs (auto|git|svn|hg|bzr|etc)  - Version control system to use (default: auto)
--rev FROM...TO                  - Revisions to check as before and after (default: if unstaged changes, check those, else check last two commits)
--vcsDir path                    - Path to root VCS directory (default: let VCS tool search)
--nonBreaking                    - Show non-breaking changes as well as breaking (default: false)
+-vcs    (auto|git|svn|etc) - Version control system to use (default: auto)
+-before revision           - Revisions to check as before  (default: if unstaged changes, check those, else check last two commits)
+-after  revision           - Revisions to check as after   (default: if unstaged changes, check those, else check last two commits)
+-vcsDir path               - Path to root VCS directory    (default: let VCS tool search)
+-nonBreaking               - Show non-breaking changes as well as breaking (default: false)
 
 abicheck        # current package only
 abicheck ./...  # check subdirectory packages
@@ -53,8 +54,6 @@ release notes.
 - Improve VCS options such as:
     - Detection of VCS and flag to overwrite
     - Choosing base VCS path to allow running for a different directory
-    - Detecting if there's unstaged changes (currently only checks committed changes) and testing those
-    - Choosing the versions to compare (e.g. via flag `-rev HEAD~1...HEAD` or similar, staying VCS agnostic)
     - Filtering `vendor/` directories (if this is the best place to do it, or leave it to go/type ast packages)
     - Check subdirectories if ran from a subdirectory of the VCS (currently checks all committed code)
 - Add docs, flow diagram and fixing of existing docs

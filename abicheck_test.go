@@ -27,8 +27,7 @@ func TestParse(t *testing.T) {
 	vcs.SetFile("rev2", "abitest.go", rev2)
 
 	// Run checks
-	c := New()
-	c.vcs = vcs
+	c := New(SetVCS(vcs))
 
 	changes, err := c.Check("rev1", "rev2")
 	if err != nil {

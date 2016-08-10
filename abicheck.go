@@ -12,6 +12,7 @@ import (
 	"go/types"
 	"io"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -49,7 +50,18 @@ func SetVLog(w io.Writer) func(*Checker) {
 	}
 }
 
+// Blank revision means use VCSs default
 func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
+	dBefore, dAfter := c.vcs.DefaultRevision()
+	if beforeRev == "" {
+		beforeRev = dBefore
+	}
+	if afterRev == "" {
+		afterRev = dAfter
+	}
+
+	c.logf("Using VCS revision before: %q after: %q\n", beforeRev, afterRev)
+
 	// Parse revisions from VCS into go/ast
 	start := time.Now()
 	c.b = c.parse(beforeRev)
@@ -97,25 +109,34 @@ type pkg struct {
 }
 
 func (c *Checker) parse(rev string) map[string]pkg {
+	c.logf("Parsing revision: %s\n", rev)
 	files, err := c.vcs.ReadDir(rev, "")
 	if err != nil {
 		c.err = err
 		return nil
 	}
 
-	fset := token.NewFileSet()
-	pkgFiles := make(map[string][]*ast.File)
+	var (
+		fset     = token.NewFileSet()
+		pkgFiles = make(map[string][]*ast.File)
+	)
 	for _, file := range files {
+		if !strings.HasSuffix(file, ".go") || strings.HasSuffix(file, "_test.go") {
+			continue
+		}
 		contents, err := c.vcs.ReadFile(rev, file)
 		if err != nil {
-			c.err = fmt.Errorf("could not read file %s at revision %s: %s", file, rev, err)
+			c.err = fmt.Errorf("could not read file %q at revision %q: %s", file, rev, err)
 			return nil
 		}
 
-		filename := rev + ":" + file
+		filename := file
+		if rev != revisionFS {
+			filename = rev + ":" + file
+		}
 		src, err := parser.ParseFile(fset, filename, contents, 0)
 		if err != nil {
-			c.err = fmt.Errorf("could not parse file %s at revision %s: %s", file, rev, err)
+			c.err = fmt.Errorf("could not parse file %q at revision %q: %s", file, rev, err)
 			return nil
 		}
 
@@ -338,6 +359,8 @@ func (c Checker) compareDecls() ([]Change, error) {
 	for pkgName, bpkg := range c.b {
 		apkg, ok := c.a[pkgName]
 		if !ok {
+			c := Change{Pkg: pkgName, Change: Breaking, Msg: "package removed"}
+			changes = append(changes, c)
 			continue
 		}
 
