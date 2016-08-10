@@ -5,14 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/importer"
 	"go/parser"
 	"go/printer"
 	"go/token"
 	"go/types"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -20,6 +22,7 @@ import (
 type Checker struct {
 	vcs  VCS
 	vlog io.Writer
+	path string // import path
 
 	b   map[string]pkg
 	a   map[string]pkg
@@ -28,10 +31,7 @@ type Checker struct {
 
 // TODO New returns a Checker with
 func New(options ...func(*Checker)) *Checker {
-	c := &Checker{
-		vcs: Git{}, // TODO make checker auto discover
-	}
-
+	c := &Checker{}
 	for _, option := range options {
 		option(c)
 	}
@@ -51,7 +51,8 @@ func SetVLog(w io.Writer) func(*Checker) {
 }
 
 // Blank revision means use VCSs default
-func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
+func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
+	// If revision is unset use VCS's default revision
 	dBefore, dAfter := c.vcs.DefaultRevision()
 	if beforeRev == "" {
 		beforeRev = dBefore
@@ -60,7 +61,12 @@ func (c *Checker) Check(beforeRev, afterRev string) ([]Change, error) {
 		afterRev = dAfter
 	}
 
-	c.logf("Using VCS revision before: %q after: %q\n", beforeRev, afterRev)
+	// If path is unset, use local directory
+	c.path = path
+	if path == "" {
+		c.path = "."
+	}
+	c.logf("import path: %q before: %q after: %q\n", c.path, beforeRev, afterRev)
 
 	// Parse revisions from VCS into go/ast
 	start := time.Now()
@@ -110,7 +116,24 @@ type pkg struct {
 
 func (c *Checker) parse(rev string) map[string]pkg {
 	c.logf("Parsing revision: %s\n", rev)
-	files, err := c.vcs.ReadDir(rev, "")
+
+	// Use go/build to get the list of files relevant for a specfic OS and ARCH
+
+	var ctx = build.Default
+	ctx.ReadDir = func(dir string) ([]os.FileInfo, error) {
+		return c.vcs.ReadDir(rev, dir)
+	}
+	ctx.OpenFile = func(path string) (io.ReadCloser, error) {
+		return c.vcs.OpenFile(rev, path)
+	}
+
+	// cwd is for relative imports, such as "."
+	cwd, err := os.Getwd()
+	if err != nil {
+		c.err = err
+		return nil
+	}
+	ipkg, err := ctx.Import(c.path, cwd, 0)
 	if err != nil {
 		c.err = err
 		return nil
@@ -120,11 +143,8 @@ func (c *Checker) parse(rev string) map[string]pkg {
 		fset     = token.NewFileSet()
 		pkgFiles = make(map[string][]*ast.File)
 	)
-	for _, file := range files {
-		if !strings.HasSuffix(file, ".go") || strings.HasSuffix(file, "_test.go") {
-			continue
-		}
-		contents, err := c.vcs.ReadFile(rev, file)
+	for _, file := range ipkg.GoFiles {
+		contents, err := c.vcs.OpenFile(rev, filepath.Join(ipkg.Dir, file))
 		if err != nil {
 			c.err = fmt.Errorf("could not read file %q at revision %q: %s", file, rev, err)
 			return nil
@@ -164,7 +184,7 @@ func (c *Checker) parse(rev string) map[string]pkg {
 			DisableUnusedImportCheck: true,
 			Importer:                 importer.Default(),
 		}
-		_, err := conf.Check("", fset, files, p.info)
+		_, err := conf.Check(ipkg.ImportPath, fset, files, p.info)
 		if err != nil {
 			c.err = err
 			return nil

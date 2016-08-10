@@ -9,18 +9,27 @@ import (
 )
 
 func main() {
+	// TODO print CLI arguments, note that it does support GOARCH, GOOS, GOPATH etc
 	before := flag.String("before", "", "Compare revision before, leave unset for the VCS default or . to bypass VCS and use filesystem version")
 	after := flag.String("after", "", "Compare revision after, leave unset for the VCS default or . to bypass VCS and use filesystem version")
 	verbose := flag.Bool("v", false, "Enable verbose logging")
 	flag.Parse()
+	path := flag.Arg(0)
 
-	var args []func(*abicheck.Checker)
+	// TODO make it auto discover
+	git, err := abicheck.NewGit()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "abicheck: %s\n", err)
+		os.Exit(2)
+	}
+
+	args := []func(*abicheck.Checker){abicheck.SetVCS(git)}
 	if *verbose {
 		args = append(args, abicheck.SetVLog(os.Stdout))
 	}
 
 	checker := abicheck.New(args...)
-	changes, err := checker.Check(*before, *after)
+	changes, err := checker.Check(path, *before, *after)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "abicheck: %s\n", err)
 		os.Exit(1)

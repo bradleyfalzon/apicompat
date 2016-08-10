@@ -3,11 +3,13 @@ package abicheck
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // revisionFS is a keyword to use the file system not VCS for read operations
@@ -19,9 +21,9 @@ const revisionFS = "."
 // local filesystem
 type VCS interface {
 	// ReadDir returns a list of files in a directory at revision
-	ReadDir(revision, path string) ([]string, error)
-	// ReadFile returns the contents of a file at a revision
-	ReadFile(revision, filename string) ([]byte, error)
+	ReadDir(revision, path string) ([]os.FileInfo, error)
+	// OpenFile returns a reader for a given absolute path at a revision
+	OpenFile(revision, path string) (io.ReadCloser, error)
 	// DefaultRevision returns the default revisions if none specified
 	DefaultRevision() (before string, after string)
 }
@@ -29,80 +31,102 @@ type VCS interface {
 var _ VCS = (*Git)(nil)
 
 // git implements vcs and uses exec.Command to access repository
-type Git struct{}
+type Git struct {
+	dir  string // directory of .git, used to for --git-dir
+	base string // directory containing .git, used to to make paths relative
+}
 
-func (Git) ReadDir(revision, path string) ([]string, error) {
-	if revision == revisionFS {
-		return readFSDir(path)
-	}
-
-	// Add trailing slash if path is set and doesn't already contain one
-	if path != "" && !strings.HasSuffix(path, string(os.PathSeparator)) {
-		path += string(os.PathSeparator)
-	}
-
-	ls, err := exec.Command("git", "ls-tree", "--name-only", revision, path).Output()
+func NewGit() (*Git, error) {
+	// Find the directory of .git, assumes git can find it via cwd
+	dir, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
-		return nil, fmt.Errorf("could not git ls-tree revision: %q, path: %q, error: %s", revision, path, err)
+		return nil, err
 	}
 
-	var files []string
+	git := &Git{}
+	git.base = string(bytes.TrimSpace(dir))
+	git.dir = filepath.Join(git.base, ".git")
+	return git, nil
+}
+
+func (g Git) rel(path string) (string, error) {
+	relPath, err := filepath.Rel(g.base, path)
+	if err != nil {
+		return "", fmt.Errorf("git cannot make path relative: %v", err)
+	}
+	return relPath, nil
+}
+
+func (g Git) ReadDir(revision, path string) ([]os.FileInfo, error) {
+	if revision == revisionFS {
+		return ioutil.ReadDir(path)
+	}
+
+	relPath, err := g.rel(path)
+	if err != nil {
+		return nil, err
+	}
+	relPath += string(os.PathSeparator)
+
+	var args = []string{"--git-dir", g.dir, "ls-tree", "--name-only", revision, relPath}
+	ls, err := exec.Command("git", args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("could not execute git %v, error: %s", args, err)
+	}
+
+	var files []os.FileInfo
 	for _, file := range bytes.Split(ls, []byte{'\n'}) {
-		files = append(files, string(file))
+		// TODO get file mode and set directory
+		files = append(files, fileInfo{
+			name: strings.TrimPrefix(string(file), relPath),
+		})
 	}
-
 	return files, nil
 }
 
-func (Git) ReadFile(revision, path string) ([]byte, error) {
+func (g Git) OpenFile(revision, path string) (io.ReadCloser, error) {
 	if revision == revisionFS {
-		return readFSFile(path)
+		return os.Open(path)
 	}
 
-	args := []string{"show", revision + ":" + path}
+	relPath, err := g.rel(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var args = []string{"--git-dir", g.dir, "show", revision + ":" + relPath}
 	contents, err := exec.Command("git", args...).Output()
 	if err != nil {
-		err = fmt.Errorf("could not execute git with args %v: %v", args, err)
+		return nil, fmt.Errorf("could not execute git with args %v: %v", args, err)
 	}
-	return contents, err
+	return ioutil.NopCloser(bytes.NewReader(contents)), nil
 }
 
-// readFSDir reads contents from the file system directly
-func readFSDir(path string) ([]string, error) {
-	if path == "" {
-		path = "."
-	}
-	dirFiles, err := ioutil.ReadDir(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not read filesystem dir %q: %v", path, err)
-	}
-
-	files := make([]string, 0, len(dirFiles))
-	for _, file := range dirFiles {
-		if !file.IsDir() {
-			files = append(files, filepath.Join(path, file.Name()))
-		}
-	}
-	return files, nil
-}
-
-// readFSFile reads a file from the file system directly
-func readFSFile(path string) ([]byte, error) {
-	return ioutil.ReadFile(path)
-}
-
-func (Git) DefaultRevision() (string, string) {
+func (g Git) DefaultRevision() (string, string) {
 	// Check if there's unstaged changes, if so, return dot
-	contents, _ := exec.Command("git", "ls-files", "-m").Output()
+	contents, _ := exec.Command("git", "--git-dir", g.dir, "ls-files", "-m").Output()
 	if len(contents) > 0 {
 		return "HEAD", "."
 	}
 	return "HEAD~1", "HEAD"
 }
 
+type fileInfo struct {
+	name string // base name of file
+	dir  bool
+}
+
+func (fi fileInfo) Name() string       { return fi.name }
+func (fi fileInfo) Size() int64        { panic("not implemented") }
+func (fi fileInfo) Mode() os.FileMode  { panic("not implemented") }
+func (fi fileInfo) ModTime() time.Time { panic("not implemented") }
+func (fi fileInfo) IsDir() bool        { return fi.dir }
+func (fi fileInfo) Sys() interface{}   { panic("not implemented") }
+
 var _ VCS = (*StrVCS)(nil)
 
-// strvcs provides a in memory vcs used for testing
+// StrVCS provides a in memory vcs used for testing, but does not support
+// subdirectories.
 type StrVCS struct {
 	files map[string]map[string][]byte // revision -> path -> contents
 }
@@ -118,16 +142,17 @@ func (v *StrVCS) SetFile(revision, path string, contents []byte) {
 	v.files[revision][path] = contents
 }
 
-func (v StrVCS) ReadDir(revision, path string) ([]string, error) {
-	var files []string
+func (v StrVCS) ReadDir(revision, path string) (files []os.FileInfo, err error) {
 	for file := range v.files[revision] {
-		files = append(files, file)
+		files = append(files, fileInfo{
+			name: file,
+		})
 	}
 	return files, nil
 }
 
-func (v StrVCS) ReadFile(revision, path string) ([]byte, error) {
-	return v.files[revision][path], nil
+func (v StrVCS) OpenFile(revision, path string) (io.ReadCloser, error) {
+	return ioutil.NopCloser(bytes.NewReader(v.files[revision][filepath.Base(path)])), nil
 }
 
 func (StrVCS) DefaultRevision() (string, string) {
