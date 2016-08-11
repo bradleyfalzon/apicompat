@@ -68,7 +68,7 @@ func (g Git) ReadDir(revision, path string) ([]os.FileInfo, error) {
 	}
 	relPath += string(os.PathSeparator)
 
-	var args = []string{"--git-dir", g.dir, "ls-tree", "--name-only", revision, relPath}
+	var args = []string{"--git-dir", g.dir, "ls-tree", revision, relPath}
 	ls, err := exec.Command("git", args...).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("could not execute git %v, error: %s", args, err)
@@ -76,9 +76,17 @@ func (g Git) ReadDir(revision, path string) ([]os.FileInfo, error) {
 
 	var files []os.FileInfo
 	for _, file := range bytes.Split(ls, []byte{'\n'}) {
-		// TODO get file mode and set directory
+		// 100644 blob 78edbf3fb411055b4a3d4d3d137ccbec160ac956    .gitignore
+		// 040000 tree e62f2cac29e1d6e31aeac65ded75df98b9c1be43    testdata
+		fields := bytes.Fields(file)
+		if len(fields) != 4 {
+			continue
+		}
+
 		files = append(files, fileInfo{
-			name: strings.TrimPrefix(string(file), relPath),
+			// name is basename (no directory structure)
+			name: strings.TrimPrefix(string(fields[3]), relPath),
+			dir:  bytes.Equal(fields[1], []byte("tree")),
 		})
 	}
 	return files, nil

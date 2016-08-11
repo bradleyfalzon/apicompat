@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	// TODO print CLI arguments, note that it does support GOARCH, GOOS, GOPATH etc
+	// TODO print CLI arguments, note that it does support GOARCH, GOOS, GOPATH etc, ./... works too
 	before := flag.String("before", "", "Compare revision before, leave unset for the VCS default or . to bypass VCS and use filesystem version")
 	after := flag.String("after", "", "Compare revision after, leave unset for the VCS default or . to bypass VCS and use filesystem version")
 	verbose := flag.Bool("v", false, "Enable verbose logging")

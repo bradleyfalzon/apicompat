@@ -15,18 +15,19 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
 // Checker is used to check for changes between two versions of a package.
 type Checker struct {
-	vcs  VCS
-	vlog io.Writer
-	path string // import path
+	vcs     VCS
+	vlog    io.Writer
+	path    string // import path
+	recurse bool   // scan paths recursively
 
-	b   map[string]pkg
-	a   map[string]pkg
-	err error
+	b map[string]pkg
+	a map[string]pkg
 }
 
 // TODO New returns a Checker with
@@ -66,18 +67,24 @@ func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
 	if path == "" {
 		c.path = "."
 	}
-	c.logf("import path: %q before: %q after: %q\n", c.path, beforeRev, afterRev)
+
+	// Detect recursion
+	if strings.HasSuffix(c.path, string(os.PathSeparator)+"...") {
+		c.recurse = true
+		c.path = c.path[:len(c.path)-len(string(os.PathSeparator)+"...")]
+	}
+	c.logf("import path: %q before: %q after: %q recursive: %v\n", c.path, beforeRev, afterRev, c.recurse)
 
 	// Parse revisions from VCS into go/ast
 	start := time.Now()
-	c.b = c.parse(beforeRev)
-	c.a = c.parse(afterRev)
-	parse := time.Since(start)
-
-	if c.err != nil {
-		// Error parsing, don't continue
-		return nil, c.err
+	var err error
+	if c.b, err = c.parse(beforeRev); err != nil {
+		return nil, err
 	}
+	if c.a, err = c.parse(afterRev); err != nil {
+		return nil, err
+	}
+	parse := time.Since(start)
 
 	start = time.Now()
 	changes, err := c.compareDecls()
@@ -109,13 +116,58 @@ func (c Checker) logf(format string, a ...interface{}) {
 }
 
 type pkg struct {
-	fset  *token.FileSet
-	decls map[string]ast.Decl
-	info  *types.Info
+	importPath string // import path
+	dir        string // complete file system path
+	fset       *token.FileSet
+	decls      map[string]ast.Decl
+	info       *types.Info
 }
 
-func (c *Checker) parse(rev string) map[string]pkg {
-	c.logf("Parsing revision: %s\n", rev)
+func (c Checker) parse(rev string) (map[string]pkg, error) {
+	c.logf("Parsing revision: %s path: %s recurse: %v\n", rev, c.path, c.recurse)
+	p, err := c.parseDir(rev, c.path)
+	pkgs := map[string]pkg{p.importPath: p}
+	if !c.recurse {
+		return pkgs, err
+	}
+	// When recursing, ignore no buildable errors, there may not have been
+	// go source files in this directory, but there maybe in sub directories
+	if err != nil && !strings.Contains(err.Error(), "no buildable") {
+		return pkgs, err
+	}
+
+	paths := c.getDirsRecursive(p.dir, rev, "")
+	for _, path := range paths {
+		p, err := c.parseDir(rev, filepath.Join(c.path, path))
+		if err != nil && !strings.Contains(err.Error(), "no buildable") {
+			return pkgs, err
+		}
+		pkgs[p.importPath] = p
+	}
+	return pkgs, nil
+}
+
+// getDirsRecursive returns relative paths to all subdirectories within base
+// at revision rev.
+func (c Checker) getDirsRecursive(base, rev, rel string) (dirs []string) {
+	paths, err := c.vcs.ReadDir(rev, filepath.Join(base, rel))
+	if err != nil {
+		c.logf("could not read path: %s revision: %s, error: %s\n", filepath.Join(base, rel), rev, err)
+		return dirs
+	}
+
+	for _, path := range paths {
+		if !path.IsDir() || path.Name() == "testdata" {
+			continue
+		}
+
+		dirs = append(dirs, filepath.Join(rel, path.Name()))
+		dirs = append(dirs, c.getDirsRecursive(base, rev, filepath.Join(rel, path.Name()))...)
+	}
+	return dirs
+}
+
+func (c Checker) parseDir(rev, dir string) (pkg, error) {
 
 	// Use go/build to get the list of files relevant for a specfic OS and ARCH
 
@@ -130,24 +182,21 @@ func (c *Checker) parse(rev string) map[string]pkg {
 	// cwd is for relative imports, such as "."
 	cwd, err := os.Getwd()
 	if err != nil {
-		c.err = err
-		return nil
+		return pkg{}, err
 	}
-	ipkg, err := ctx.Import(c.path, cwd, 0)
+	ipkg, err := ctx.Import(dir, cwd, 0)
 	if err != nil {
-		c.err = fmt.Errorf("go/build error: %v", err)
-		return nil
+		return pkg{}, fmt.Errorf("go/build error: %v", err)
 	}
 
 	var (
 		fset     = token.NewFileSet()
-		pkgFiles = make(map[string][]*ast.File)
+		pkgFiles []*ast.File
 	)
 	for _, file := range ipkg.GoFiles {
 		contents, err := c.vcs.OpenFile(rev, filepath.Join(ipkg.Dir, file))
 		if err != nil {
-			c.err = fmt.Errorf("could not read file %q at revision %q: %s", file, rev, err)
-			return nil
+			return pkg{}, fmt.Errorf("could not read file %q at revision %q: %s", file, rev, err)
 		}
 
 		filename := file
@@ -156,43 +205,39 @@ func (c *Checker) parse(rev string) map[string]pkg {
 		}
 		src, err := parser.ParseFile(fset, filename, contents, 0)
 		if err != nil {
-			c.err = fmt.Errorf("could not parse file %q at revision %q: %s", file, rev, err)
-			return nil
+			return pkg{}, fmt.Errorf("could not parse file %q at revision %q: %s", file, rev, err)
 		}
 
-		pkgFiles[ipkg.ImportPath] = append(pkgFiles[ipkg.ImportPath], src)
+		pkgFiles = append(pkgFiles, src)
 	}
 
 	// Loop through all the parsed files and type check them
 
-	pkgs := make(map[string]pkg)
-	for pkgName, files := range pkgFiles {
-		p := pkg{
-			fset: fset,
-			info: &types.Info{
-				Types: make(map[ast.Expr]types.TypeAndValue),
-				Defs:  make(map[*ast.Ident]types.Object),
-				Uses:  make(map[*ast.Ident]types.Object),
-			},
-		}
-
-		conf := &types.Config{
-			IgnoreFuncBodies:         true,
-			DisableUnusedImportCheck: true,
-			Importer:                 importer.Default(),
-		}
-		_, err := conf.Check(ipkg.ImportPath, fset, files, p.info)
-		if err != nil {
-			c.err = fmt.Errorf("go/types error: %v", err)
-			return nil
-		}
-
-		// Get declarations and nil their bodies, so do it last
-		p.decls = pkgDecls(files)
-
-		pkgs[pkgName] = p
+	p := pkg{
+		importPath: ipkg.ImportPath,
+		dir:        ipkg.Dir,
+		fset:       fset,
+		info: &types.Info{
+			Types: make(map[ast.Expr]types.TypeAndValue),
+			Defs:  make(map[*ast.Ident]types.Object),
+			Uses:  make(map[*ast.Ident]types.Object),
+		},
 	}
-	return pkgs
+
+	conf := &types.Config{
+		IgnoreFuncBodies:         true,
+		DisableUnusedImportCheck: true,
+		Importer:                 importer.Default(),
+	}
+	_, err = conf.Check(ipkg.ImportPath, fset, pkgFiles, p.info)
+	if err != nil {
+		return pkg{}, fmt.Errorf("go/types error: %v", err)
+	}
+
+	// Get declarations and nil their bodies, so do it last
+	p.decls = pkgDecls(pkgFiles)
+
+	return p, nil
 }
 
 // pkgDecls returns all declarations that need to be checked, this includes
