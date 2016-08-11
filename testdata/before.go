@@ -8,6 +8,10 @@ import (
 	tmplX "text/template"
 )
 
+func init() {
+	_ = 1
+}
+
 // ConstMultiSpec* checks support for multiple specs
 const (
 	ConstMultiSpecA int = 0

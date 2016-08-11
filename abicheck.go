@@ -135,7 +135,7 @@ func (c *Checker) parse(rev string) map[string]pkg {
 	}
 	ipkg, err := ctx.Import(c.path, cwd, 0)
 	if err != nil {
-		c.err = err
+		c.err = fmt.Errorf("go/build error: %v", err)
 		return nil
 	}
 
@@ -176,8 +176,6 @@ func (c *Checker) parse(rev string) map[string]pkg {
 			},
 		}
 
-		p.decls = pkgDecls(files)
-
 		conf := &types.Config{
 			IgnoreFuncBodies:         true,
 			DisableUnusedImportCheck: true,
@@ -185,9 +183,12 @@ func (c *Checker) parse(rev string) map[string]pkg {
 		}
 		_, err := conf.Check(ipkg.ImportPath, fset, files, p.info)
 		if err != nil {
-			c.err = err
+			c.err = fmt.Errorf("go/types error: %v", err)
 			return nil
 		}
+
+		// Get declarations and nil their bodies, so do it last
+		p.decls = pkgDecls(files)
 
 		pkgs[pkgName] = p
 	}
