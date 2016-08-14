@@ -150,17 +150,17 @@ func (fi fileInfo) IsDir() bool { return fi.dir }
 // Sys is one of the method needed to implement os.FileInfo
 func (fi fileInfo) Sys() interface{} { panic("not implemented") }
 
-// guarantee at compile time that strVCS implements VCS
-var _ VCS = (*strVCS)(nil)
+// guarantee at compile time that StrVCS implements VCS
+var _ VCS = (*StrVCS)(nil)
 
-// strVCS provides a in memory vcs used for testing, but does not support
+// StrVCS provides a in memory vcs used for testing, but does not support
 // subdirectories.
-type strVCS struct {
+type StrVCS struct {
 	files map[string]map[string][]byte // revision -> path -> contents
 }
 
 // SetFile contents for a particular revision and path
-func (v *strVCS) SetFile(revision, path string, contents []byte) {
+func (v *StrVCS) SetFile(revision, path string, contents []byte) {
 	if v.files == nil {
 		v.files = make(map[string]map[string][]byte)
 	}
@@ -170,7 +170,7 @@ func (v *strVCS) SetFile(revision, path string, contents []byte) {
 	v.files[revision][path] = contents
 }
 
-func (v strVCS) ReadDir(revision, path string) (files []os.FileInfo, err error) {
+func (v StrVCS) ReadDir(revision, path string) (files []os.FileInfo, err error) {
 	for file := range v.files[revision] {
 		files = append(files, fileInfo{
 			name: file,
@@ -179,10 +179,10 @@ func (v strVCS) ReadDir(revision, path string) (files []os.FileInfo, err error) 
 	return files, nil
 }
 
-func (v strVCS) OpenFile(revision, path string) (io.ReadCloser, error) {
+func (v StrVCS) OpenFile(revision, path string) (io.ReadCloser, error) {
 	return ioutil.NopCloser(bytes.NewReader(v.files[revision][filepath.Base(path)])), nil
 }
 
-func (strVCS) DefaultRevision() (string, string) {
+func (StrVCS) DefaultRevision() (string, string) {
 	return "rev1", "rev2"
 }
