@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // revisionFS is a keyword to use the file system not VCS for read operations
@@ -124,3 +125,27 @@ func (g *Git) DefaultRevision() (string, string) {
 	}
 	return "HEAD~1", "HEAD"
 }
+
+// fileInfo is a struct to simulate the real filesystem file info
+type fileInfo struct {
+	name string // base name of file
+	dir  bool
+}
+
+// Name is one of the method needed to implement os.FileInfo
+func (fi fileInfo) Name() string { return fi.name }
+
+// Size is one of the method needed to implement os.FileInfo
+func (fi fileInfo) Size() int64 { panic("not implemented") }
+
+// Mode is one of the method needed to implement os.FileInfo
+func (fi fileInfo) Mode() os.FileMode { panic("not implemented") }
+
+// ModTime is one of the method needed to implement os.FileInfo
+func (fi fileInfo) ModTime() time.Time { panic("not implemented") }
+
+// IsDir is one of the method needed to implement os.FileInfo
+func (fi fileInfo) IsDir() bool { return fi.dir }
+
+// Sys is one of the method needed to implement os.FileInfo
+func (fi fileInfo) Sys() interface{} { panic("not implemented") }
