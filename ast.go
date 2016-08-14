@@ -234,7 +234,7 @@ func (d *diffResult) RemoveVariadicCompatible(chkr DeclChecker) (msg string) {
 	if len(d.added) == 1 && !d.Removed() && !d.Modified() {
 		if _, ok := d.added[0].Type.(*ast.Ellipsis); ok {
 			// we're adding a variadic
-			d.added = []*ast.Field{}
+			d.added = nil
 			return "added a variadic parameter"
 		}
 	}
@@ -245,7 +245,7 @@ func (d *diffResult) RemoveVariadicCompatible(chkr DeclChecker) (msg string) {
 
 		if ok && types.Identical(chkr.binfo.TypeOf(btype), chkr.ainfo.TypeOf(variadic.Elt)) {
 			// we're changing to a variadic of the same type
-			d.modified = [][2]*ast.Field{}
+			d.modified = nil
 			return "change parameter to variadic"
 		}
 	}
