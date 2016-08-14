@@ -1,3 +1,2 @@
 /abicheck
-testgit/.git
-testgit/testdata.go
+testdata/gopath

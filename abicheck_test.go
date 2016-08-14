@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"testing"
 )
 
+// TestParse tests the results from the parser against an expected golden master
 func TestParse(t *testing.T) {
 	// Create strvcs and fill it with test data
 	vcs := StrVCS{}
@@ -58,5 +61,67 @@ func TestParse(t *testing.T) {
 	// Compare results gold master
 	if !reflect.DeepEqual(exp, buf.Bytes()) {
 		t.Errorf("got:\n%v\nexp:\n%v\n", buf.String(), string(exp))
+	}
+}
+
+// TestPaths tests an example project with various paths and verifies
+// it finds a certain number of changes ensuring recursive is working
+// as expected
+func TestPaths(t *testing.T) {
+
+	// Make the test data dirs
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testdataDir := filepath.Join(wd, "testdata")
+
+	cmd := exec.Command("./make.sh")
+	cmd.Dir = testdataDir
+	err = cmd.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		wd   string // working dir relative to testdata/gopath/src
+		path string // import path
+		exp  int    // expected number of changes
+	}{
+		{"", "example.com/lib", 58},
+		{"", "example.com/lib/...", 116},   // recursive
+		{"", "example.com/lib/b/...", 58},  // empty directory
+		{"example.com/lib", "", 58},        // working directory
+		{"example.com/lib", "./...", 116},  // working directory recursive
+		{"example.com/lib/b", "./...", 58}, // empty working directory
+	}
+
+	oldPath := os.Getenv("GOPATH")
+	defer func() {
+		os.Setenv("GOPATH", oldPath)
+	}()
+	os.Setenv("GOPATH", filepath.Join(testdataDir, "gopath"))
+
+	for _, test := range tests {
+		t.Logf("Test: %#v", test)
+		err := os.Chdir(filepath.Join(testdataDir, "gopath", "src", test.wd))
+		if err != nil {
+			t.Errorf("Cannot chdir: %s", err)
+		}
+
+		git, err := NewGit()
+		if err != nil {
+			t.Errorf("Cannot get new git: %s", err)
+		}
+		checker := New(SetVCS(git))
+
+		changes, err := checker.Check(test.path, "HEAD~1", "HEAD")
+		if err != nil {
+			t.Errorf("Check error: %s", err)
+		}
+
+		if test.exp != len(changes) {
+			t.Errorf("exp %d got %d", test.exp, len(changes))
+		}
 	}
 }

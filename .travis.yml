@@ -4,4 +4,3 @@ before_install:
     - go get golang.org/x/tools/cmd/cover
 script:
     - $HOME/gopath/bin/goveralls -service=travis-ci
-    - cd testgit; bash make.sh && abicheck

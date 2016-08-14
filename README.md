@@ -48,8 +48,6 @@ release notes.
 
 `abicheck` is currently under heavy development and refactoring. This initial version was a proof of concept and shortcuts were taken. The current tasks are focused on (but not limited to):
 
-- Choosing of import paths as the first argument, similar to other tools (no argument means just current directory, else
-    support `./...` and specifying)
 - Adding Mercurial, SVN and potentially other VCS systems
 - Improve VCS options such as:
     - Detection of VCS and flag to overwrite
@@ -59,7 +57,6 @@ release notes.
 - Add docs, flow diagram and fixing of existing docs
 - Improve output formats (such as vim quickfix)
 - Move these tasks to GitHub issues
-- Improve test coverage and move away from golden masters (it was just a quick hack, not a long term solution)
 - Once all other steps have been completed, performance will be investigated
 
 # Testing

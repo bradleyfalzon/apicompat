@@ -19,6 +19,10 @@ import (
 	"time"
 )
 
+// When the path is not set, it means the current working directory
+// go/build understands this as "."
+const cwd = "."
+
 // Checker is used to check for changes between two versions of a package.
 type Checker struct {
 	vcs     VCS
@@ -65,7 +69,7 @@ func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
 	// If path is unset, use local directory
 	c.path = path
 	if path == "" {
-		c.path = "."
+		c.path = cwd
 	}
 
 	// Detect recursion
@@ -117,30 +121,42 @@ func (c Checker) logf(format string, a ...interface{}) {
 
 type pkg struct {
 	importPath string // import path
-	dir        string // complete file system path
 	fset       *token.FileSet
 	decls      map[string]ast.Decl
 	info       *types.Info
 }
 
-func (c Checker) parse(rev string) (map[string]pkg, error) {
+func (c Checker) parse(rev string) (pkgs map[string]pkg, err error) {
 	c.logf("Parsing revision: %s path: %s recurse: %v\n", rev, c.path, c.recurse)
-	p, err := c.parseDir(rev, c.path)
-	pkgs := map[string]pkg{p.importPath: p}
-	if !c.recurse {
-		return pkgs, err
-	}
-	// When recursing, ignore no buildable errors, there may not have been
-	// go source files in this directory, but there maybe in sub directories
-	if err != nil && !strings.Contains(err.Error(), "no buildable") {
-		return pkgs, err
+
+	// c.path is either dot or import path
+	paths := []string{c.path}
+	if c.recurse {
+		// Technically this isn't correct, GOPATH could be a list
+		var (
+			dir    = filepath.Join(os.Getenv("GOPATH"), "src")
+			prefix = ""
+		)
+		if c.path == cwd {
+			// could c.path = getwd instead ?
+			if dir, err = os.Getwd(); err != nil {
+				return nil, err
+			}
+			prefix = "." + string(os.PathSeparator)
+		}
+		paths = append(paths, c.getDirsRecursive(dir, rev, c.path, prefix)...)
 	}
 
-	paths := c.getDirsRecursive(p.dir, rev, "")
+	c.logf("building paths: %s\n", paths)
+
+	pkgs = make(map[string]pkg)
 	for _, path := range paths {
-		p, err := c.parseDir(rev, filepath.Join(c.path, path))
-		if err != nil && !strings.Contains(err.Error(), "no buildable") {
-			return pkgs, err
+		p, err := c.parseDir(rev, path)
+		if err != nil {
+			// skip errors if we're recursing and the error is no buildable sources
+			if !c.recurse || !strings.Contains(err.Error(), "no buildable") {
+				return pkgs, err
+			}
 		}
 		pkgs[p.importPath] = p
 	}
@@ -148,8 +164,8 @@ func (c Checker) parse(rev string) (map[string]pkg, error) {
 }
 
 // getDirsRecursive returns relative paths to all subdirectories within base
-// at revision rev.
-func (c Checker) getDirsRecursive(base, rev, rel string) (dirs []string) {
+// at revision rev. Paths can be prefixed with prefix
+func (c Checker) getDirsRecursive(base, rev, rel, prefix string) (dirs []string) {
 	paths, err := c.vcs.ReadDir(rev, filepath.Join(base, rel))
 	if err != nil {
 		c.logf("could not read path: %s revision: %s, error: %s\n", filepath.Join(base, rel), rev, err)
@@ -161,8 +177,8 @@ func (c Checker) getDirsRecursive(base, rev, rel string) (dirs []string) {
 			continue
 		}
 
-		dirs = append(dirs, filepath.Join(rel, path.Name()))
-		dirs = append(dirs, c.getDirsRecursive(base, rev, filepath.Join(rel, path.Name()))...)
+		dirs = append(dirs, prefix+filepath.Join(rel, path.Name()))
+		dirs = append(dirs, c.getDirsRecursive(base, rev, filepath.Join(rel, path.Name()), prefix)...)
 	}
 	return dirs
 }
@@ -178,13 +194,14 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 	ctx.OpenFile = func(path string) (io.ReadCloser, error) {
 		return c.vcs.OpenFile(rev, path)
 	}
+	ctx.GOPATH = os.Getenv("GOPATH")
 
-	// cwd is for relative imports, such as "."
-	cwd, err := os.Getwd()
+	// wd is for relative imports, such as "."
+	wd, err := os.Getwd()
 	if err != nil {
 		return pkg{}, err
 	}
-	ipkg, err := ctx.Import(dir, cwd, 0)
+	ipkg, err := ctx.Import(dir, wd, 0)
 	if err != nil {
 		return pkg{}, fmt.Errorf("go/build error: %v", err)
 	}
@@ -215,7 +232,6 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 
 	p := pkg{
 		importPath: ipkg.ImportPath,
-		dir:        ipkg.Dir,
 		fset:       fset,
 		info: &types.Info{
 			Types: make(map[ast.Expr]types.TypeAndValue),
