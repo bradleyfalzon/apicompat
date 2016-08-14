@@ -9,13 +9,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // revisionFS is a keyword to use the file system not VCS for read operations
 const revisionFS = "."
 
-// vcs interface defines a version control system
+// VCS defines a version control system
 // the vcs should be able to handle calls to ReadFile concurrently
 // A special case for the revision of "." (without quotes) is used to check
 // local filesystem
@@ -28,14 +27,16 @@ type VCS interface {
 	DefaultRevision() (before string, after string)
 }
 
+// guarantee at compile time that *Git implements VCS
 var _ VCS = (*Git)(nil)
 
-// git implements vcs and uses exec.Command to access repository
+// Git implements vcs and uses exec.Command to access repository
 type Git struct {
 	dir  string // directory of .git, used to for --git-dir
 	base string // directory containing .git, used to to make paths relative
 }
 
+// NewGit returns a VCS based based on git.
 func NewGit() (*Git, error) {
 	// Find the directory of .git, assumes git can find it via cwd
 	dir, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
@@ -43,13 +44,15 @@ func NewGit() (*Git, error) {
 		return nil, err
 	}
 
-	git := &Git{}
-	git.base = string(bytes.TrimSpace(dir))
-	git.dir = filepath.Join(git.base, ".git")
-	return git, nil
+	base := string(bytes.TrimSpace(dir))
+	return &Git{
+		base: base,
+		dir:  filepath.Join(base, ".git"),
+	}, nil
 }
 
-func (g Git) rel(path string) (string, error) {
+// rel returns the relative path to this path.
+func (g *Git) rel(path string) (string, error) {
 	relPath, err := filepath.Rel(g.base, path)
 	if err != nil {
 		return "", fmt.Errorf("git cannot make path relative: %v", err)
@@ -57,7 +60,8 @@ func (g Git) rel(path string) (string, error) {
 	return relPath, nil
 }
 
-func (g Git) ReadDir(revision, path string) ([]os.FileInfo, error) {
+// ReadDir returns a list of files in a directory at revision
+func (g *Git) ReadDir(revision, path string) ([]os.FileInfo, error) {
 	if revision == revisionFS {
 		return ioutil.ReadDir(path)
 	}
@@ -68,7 +72,7 @@ func (g Git) ReadDir(revision, path string) ([]os.FileInfo, error) {
 	}
 	relPath += string(os.PathSeparator)
 
-	var args = []string{"--git-dir", g.dir, "ls-tree", revision, relPath}
+	args := []string{"--git-dir", g.dir, "ls-tree", revision, relPath}
 	ls, err := exec.Command("git", args...).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("could not execute git %v, error: %s", args, err)
@@ -92,7 +96,8 @@ func (g Git) ReadDir(revision, path string) ([]os.FileInfo, error) {
 	return files, nil
 }
 
-func (g Git) OpenFile(revision, path string) (io.ReadCloser, error) {
+// OpenFile returns a reader for a given absolute path at a revision
+func (g *Git) OpenFile(revision, path string) (io.ReadCloser, error) {
 	if revision == revisionFS {
 		return os.Open(path)
 	}
@@ -110,59 +115,12 @@ func (g Git) OpenFile(revision, path string) (io.ReadCloser, error) {
 	return ioutil.NopCloser(bytes.NewReader(contents)), nil
 }
 
-func (g Git) DefaultRevision() (string, string) {
+// DefaultRevision returns the default revisions if none specified
+func (g *Git) DefaultRevision() (string, string) {
 	// Check if there's unstaged changes, if so, return dot
 	contents, _ := exec.Command("git", "--git-dir", g.dir, "ls-files", "-m").Output()
 	if len(contents) > 0 {
 		return "HEAD", "."
 	}
 	return "HEAD~1", "HEAD"
-}
-
-type fileInfo struct {
-	name string // base name of file
-	dir  bool
-}
-
-func (fi fileInfo) Name() string       { return fi.name }
-func (fi fileInfo) Size() int64        { panic("not implemented") }
-func (fi fileInfo) Mode() os.FileMode  { panic("not implemented") }
-func (fi fileInfo) ModTime() time.Time { panic("not implemented") }
-func (fi fileInfo) IsDir() bool        { return fi.dir }
-func (fi fileInfo) Sys() interface{}   { panic("not implemented") }
-
-var _ VCS = (*StrVCS)(nil)
-
-// StrVCS provides a in memory vcs used for testing, but does not support
-// subdirectories.
-type StrVCS struct {
-	files map[string]map[string][]byte // revision -> path -> contents
-}
-
-// SetFile contents for a particular revision and path
-func (v *StrVCS) SetFile(revision, path string, contents []byte) {
-	if v.files == nil {
-		v.files = make(map[string]map[string][]byte)
-	}
-	if _, ok := v.files[revision]; !ok {
-		v.files[revision] = make(map[string][]byte)
-	}
-	v.files[revision][path] = contents
-}
-
-func (v StrVCS) ReadDir(revision, path string) (files []os.FileInfo, err error) {
-	for file := range v.files[revision] {
-		files = append(files, fileInfo{
-			name: file,
-		})
-	}
-	return files, nil
-}
-
-func (v StrVCS) OpenFile(revision, path string) (io.ReadCloser, error) {
-	return ioutil.NopCloser(bytes.NewReader(v.files[revision][filepath.Base(path)])), nil
-}
-
-func (StrVCS) DefaultRevision() (string, string) {
-	return "rev1", "rev2"
 }

@@ -34,7 +34,7 @@ type Checker struct {
 	a map[string]pkg
 }
 
-// TODO New returns a Checker with
+// New returns a Checker with the given options.
 func New(options ...func(*Checker)) *Checker {
 	c := &Checker{}
 	for _, option := range options {
@@ -43,12 +43,14 @@ func New(options ...func(*Checker)) *Checker {
 	return c
 }
 
+// SetVCS is an option to New that sets the VCS for the checker.
 func SetVCS(vcs VCS) func(*Checker) {
 	return func(c *Checker) {
 		c.vcs = vcs
 	}
 }
 
+// SetVLog is an option to New that sets the logger for the checker.
 func SetVLog(w io.Writer) func(*Checker) {
 	return func(c *Checker) {
 		c.vlog = w
@@ -96,8 +98,8 @@ func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "error comparing declarations: %s\n", err)
 		if derr, ok := err.(*diffError); ok {
-			_ = ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
-			_ = ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)
+			ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
+			ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)
 		}
 		return nil, errors.New(buf.String())
 	}
@@ -187,7 +189,7 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 
 	// Use go/build to get the list of files relevant for a specfic OS and ARCH
 
-	var ctx = build.Default
+	ctx := build.Default
 	ctx.ReadDir = func(dir string) ([]os.FileInfo, error) {
 		return c.vcs.ReadDir(rev, dir)
 	}
@@ -386,7 +388,7 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 	return decls
 }
 
-// change is the ast declaration containing the before and after
+// Change is the ast declaration containing the before and after
 type Change struct {
 	Pkg    string   // Pkg is the name of the package the change occurred in
 	ID     string   // ID is an identifier to match a declaration between versions
@@ -398,9 +400,9 @@ type Change struct {
 }
 
 func (c Change) String() string {
-	fset := token.FileSet{} // only require non-nil fset
+	var fset token.FileSet // only require non-nil fset
+	var buf bytes.Buffer
 	pcfg := printer.Config{Mode: printer.RawFormat, Indent: 1}
-	buf := bytes.Buffer{}
 
 	fmt.Fprintf(&buf, "%s: %s %s\n", c.Pos, c.Change, c.Msg)
 

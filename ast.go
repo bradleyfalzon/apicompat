@@ -13,22 +13,27 @@ import (
 	"strings"
 )
 
+// The different declaration messages the package can generate.
 const (
 	None        = "no change"
 	NonBreaking = "non-breaking change"
 	Breaking    = "breaking change"
 )
 
+// DeclChange represents a single change between 2 revision.
 type DeclChange struct {
 	Change string
 	Msg    string
 }
 
+// DeclChecker takes a list of changes and verifies which, if any, change breaks
+// the API.
 type DeclChecker struct {
 	binfo *types.Info
 	ainfo *types.Info
 }
 
+// NewDeclChecker creates a DeclChecker.
 func NewDeclChecker(bi, ai *types.Info) *DeclChecker {
 	return &DeclChecker{binfo: bi, ainfo: ai}
 }
@@ -37,9 +42,9 @@ func nonBreaking(msg string) (*DeclChange, error) { return &DeclChange{NonBreaki
 func breaking(msg string) (*DeclChange, error)    { return &DeclChange{Breaking, msg}, nil }
 func none() (*DeclChange, error)                  { return &DeclChange{None, ""}, nil }
 
-// equal compares two declarations and returns true if they do not have
-// incompatible changes. For example, comments aren't compared, names of
-// arguments aren't compared etc.
+// Check compares two declarations and returns the DeclChange associated with
+// that change. For example, comments aren't compared, names of arguments aren't
+// compared etc.
 func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
 	// compare types, ignore comments etc, so reflect.DeepEqual isn't good enough
 
@@ -316,7 +321,7 @@ func (c DeclChecker) diffFields(before, after []*ast.Field) diffResult {
 		AfterMembers[fieldKey(field, i)] = field
 	}
 
-	r := diffResult{}
+	var r diffResult
 
 	for i, bfield := range before {
 		bkey := fieldKey(bfield, i)
