@@ -15,7 +15,7 @@ import (
 // TestParse tests the results from the parser against an expected golden master
 func TestParse(t *testing.T) {
 	// Create strvcs and fill it with test data
-	vcs := StrVCS{}
+	var vcs StrVCS
 
 	rev1, err := ioutil.ReadFile("testdata/before.go")
 	if err != nil {

@@ -13,39 +13,49 @@ import (
 	"strings"
 )
 
+// The different declaration messages the package can generate.
 const (
 	None        = "no change"
 	NonBreaking = "non-breaking change"
 	Breaking    = "breaking change"
 )
 
+// DeclChange represents a single change between 2 revision.
 type DeclChange struct {
 	Change string
 	Msg    string
 }
 
+// DeclChecker takes a list of changes and verifies which, if any, change breaks
+// the API.
 type DeclChecker struct {
 	binfo *types.Info
 	ainfo *types.Info
 }
 
+// NewDeclChecker creates a DeclChecker.
 func NewDeclChecker(bi, ai *types.Info) *DeclChecker {
 	return &DeclChecker{binfo: bi, ainfo: ai}
 }
 
-func nonBreaking(msg string) (*DeclChange, error) { return &DeclChange{NonBreaking, msg}, nil }
-func breaking(msg string) (*DeclChange, error)    { return &DeclChange{Breaking, msg}, nil }
-func none() (*DeclChange, error)                  { return &DeclChange{None, ""}, nil }
+// nonBreaking returns a DeclChange with the non-breaking change type.
+func nonBreaking(msg string) DeclChange { return DeclChange{NonBreaking, msg} }
 
-// equal compares two declarations and returns true if they do not have
-// incompatible changes. For example, comments aren't compared, names of
-// arguments aren't compared etc.
-func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
+// breaking returns a DeclChange with the breaking change type.
+func breaking(msg string) DeclChange { return DeclChange{Breaking, msg} }
+
+// none returns a DeclChange with the no change type.
+func none() DeclChange { return DeclChange{None, ""} }
+
+// Check compares two declarations and returns the DeclChange associated with
+// that change. For example, comments aren't compared, names of arguments aren't
+// compared etc.
+func (c DeclChecker) Check(before, after ast.Decl) (DeclChange, error) {
 	// compare types, ignore comments etc, so reflect.DeepEqual isn't good enough
 
 	if reflect.TypeOf(before) != reflect.TypeOf(after) {
 		// Declaration type changed, such as GenDecl to FuncDecl (eg var/const to func)
-		return breaking("changed declaration")
+		return breaking("changed declaration"), nil
 	}
 
 	switch b := before.(type) {
@@ -56,7 +66,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
 
 		if reflect.TypeOf(b.Specs[0]) != reflect.TypeOf(a.Specs[0]) {
 			// Spec changed, such as ValueSpec to TypeSpec (eg var/const to struct)
-			return breaking("changed spec")
+			return breaking("changed spec"), nil
 		}
 
 		switch bspec := b.Specs[0].(type) {
@@ -71,7 +81,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
 				// Inferred types from external packages (inc. stdlib) aren't identical
 				// according to types.Identical(), so compare the string representations
 				if btype.String() != atype.String() {
-					return breaking("changed type")
+					return breaking("changed type"), nil
 				}
 			}
 		case *ast.TypeSpec:
@@ -80,7 +90,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
 
 			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
 				// Spec change, such as from StructType to InterfaceType or different aliased types
-				return breaking("changed type of value spec")
+				return breaking("changed type of value spec"), nil
 			}
 
 			switch btype := bspec.Type.(type) {
@@ -95,7 +105,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
 				atype := aspec.Type.(*ast.Ident)
 				if btype.Name != atype.Name {
 					// Alias typing changed underlying types
-					return breaking("alias changed its underlying type")
+					return breaking("alias changed its underlying type"), nil
 				}
 			}
 		}
@@ -103,59 +113,59 @@ func (c DeclChecker) Check(before, after ast.Decl) (*DeclChange, error) {
 		a := after.(*ast.FuncDecl)
 		return c.checkFunc(b.Type, a.Type)
 	default:
-		return nil, fmt.Errorf("unknown declaration type: %T", before)
+		return DeclChange{}, fmt.Errorf("unknown declaration type: %T", before)
 	}
-	return none()
+	return none(), nil
 }
 
-func (c DeclChecker) checkChan(before, after *ast.ChanType) (*DeclChange, error) {
+func (c DeclChecker) checkChan(before, after *ast.ChanType) (DeclChange, error) {
 	if !c.exprEqual(before.Value, after.Value) {
-		return breaking("changed channel's type")
+		return breaking("changed channel's type"), nil
 	}
 
 	// If we're specifying a direction and it's not the same as before
 	// (if we remove direction then that change isn't breaking)
 	if before.Dir != after.Dir {
 		if after.Dir != ast.SEND && after.Dir != ast.RECV {
-			return nonBreaking("removed channel's direction")
+			return nonBreaking("removed channel's direction"), nil
 		}
-		return breaking("changed channel's direction")
+		return breaking("changed channel's direction"), nil
 	}
-	return none()
+	return none(), nil
 }
 
-func (c DeclChecker) checkInterface(before, after *ast.InterfaceType) (*DeclChange, error) {
+func (c DeclChecker) checkInterface(before, after *ast.InterfaceType) (DeclChange, error) {
 	// interfaces don't care if methods are removed
 	r := c.diffFields(before.Methods.List, after.Methods.List)
 	if r.Added() {
 		// Fields were added
-		return breaking("members added")
+		return breaking("members added"), nil
 	} else if r.Modified() {
 		// Fields changed types
-		return breaking("members changed types")
+		return breaking("members changed types"), nil
 	} else if r.Removed() {
-		return nonBreaking("members removed")
+		return nonBreaking("members removed"), nil
 	}
 
-	return none()
+	return none(), nil
 }
 
-func (c DeclChecker) checkStruct(before, after *ast.StructType) (*DeclChange, error) {
+func (c DeclChecker) checkStruct(before, after *ast.StructType) (DeclChange, error) {
 	// structs don't care if fields were added
 	r := c.diffFields(before.Fields.List, after.Fields.List)
 	if r.Removed() {
 		// Fields were removed
-		return breaking("members removed")
+		return breaking("members removed"), nil
 	} else if r.Modified() {
 		// Fields changed types
-		return breaking("members changed types")
+		return breaking("members changed types"), nil
 	} else if r.Added() {
-		return nonBreaking("members added")
+		return nonBreaking("members added"), nil
 	}
-	return none()
+	return none(), nil
 }
 
-func (c DeclChecker) checkFunc(before, after *ast.FuncType) (*DeclChange, error) {
+func (c DeclChecker) checkFunc(before, after *ast.FuncType) (DeclChange, error) {
 	// don't compare argument names
 	bparams := stripNames(before.Params.List)
 	aparams := stripNames(after.Params.List)
@@ -164,16 +174,16 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (*DeclChange, error)
 	variadicMsg := r.RemoveVariadicCompatible(c)
 	interfaceMsg, err := r.RemoveInterfaceCompatible(c)
 	if err != nil {
-		return nil, err
+		return DeclChange{}, err
 	}
 	if r.Changed() {
-		return breaking("parameter types changed")
+		return breaking("parameter types changed"), nil
 	}
 
 	if before.Results != nil {
 		if after.Results == nil {
 			// removed return parameter
-			return breaking("removed return parameter")
+			return breaking("removed return parameter"), nil
 		}
 
 		// don't compare argument names
@@ -185,18 +195,18 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (*DeclChange, error)
 		if len(before.Results.List) > 0 {
 			r := c.diffFields(bresults, aresults)
 			if r.Changed() {
-				return breaking("return parameters changed")
+				return breaking("return parameters changed"), nil
 			}
 		}
 	}
 
 	switch {
 	case interfaceMsg != "":
-		return nonBreaking(interfaceMsg)
+		return nonBreaking(interfaceMsg), nil
 	case variadicMsg != "":
-		return nonBreaking(variadicMsg)
+		return nonBreaking(variadicMsg), nil
 	default:
-		return none()
+		return none(), nil
 	}
 }
 
@@ -223,7 +233,7 @@ func (d *diffResult) RemoveVariadicCompatible(chkr DeclChecker) (msg string) {
 	if len(d.added) == 1 && !d.Removed() && !d.Modified() {
 		if _, ok := d.added[0].Type.(*ast.Ellipsis); ok {
 			// we're adding a variadic
-			d.added = []*ast.Field{}
+			d.added = nil
 			return "added a variadic parameter"
 		}
 	}
@@ -234,7 +244,7 @@ func (d *diffResult) RemoveVariadicCompatible(chkr DeclChecker) (msg string) {
 
 		if ok && types.Identical(chkr.binfo.TypeOf(btype), chkr.ainfo.TypeOf(variadic.Elt)) {
 			// we're changing to a variadic of the same type
-			d.modified = [][2]*ast.Field{}
+			d.modified = nil
 			return "change parameter to variadic"
 		}
 	}
@@ -303,7 +313,7 @@ func (c DeclChecker) diffFields(before, after []*ast.Field) diffResult {
 		AfterMembers[fieldKey(field, i)] = field
 	}
 
-	r := diffResult{}
+	var r diffResult
 
 	for i, bfield := range before {
 		bkey := fieldKey(bfield, i)
