@@ -14,6 +14,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -25,10 +26,12 @@ const cwd = "."
 
 // Checker is used to check for changes between two versions of a package.
 type Checker struct {
-	vcs     VCS
-	vlog    io.Writer
-	path    string // import path
-	recurse bool   // scan paths recursively
+	vcs         VCS
+	vlog        io.Writer
+	path        string         // import path
+	recurse     bool           // scan paths recursively
+	excludeFile *regexp.Regexp // exclude files
+	excludeDir  *regexp.Regexp // exclude directory
 
 	b map[string]pkg
 	a map[string]pkg
@@ -52,6 +55,21 @@ func SetVCS(vcs VCS) func(*Checker) {
 func SetVLog(w io.Writer) func(*Checker) {
 	return func(c *Checker) {
 		c.vlog = w
+	}
+}
+
+// SetExcludeFile excludes checking of files based on regexp pattern
+func SetExcludeFile(pattern string) func(*Checker) {
+	return func(c *Checker) {
+		c.excludeFile = regexp.MustCompile(pattern)
+	}
+}
+
+// SetExcludeDir excludes checking of a directory based on regexp pattern.
+// Usually only help when running recursively.
+func SetExcludeDir(pattern string) func(*Checker) {
+	return func(c *Checker) {
+		c.excludeDir = regexp.MustCompile(pattern)
 	}
 }
 
@@ -151,6 +169,11 @@ func (c Checker) parse(rev string) (pkgs map[string]pkg, err error) {
 
 	pkgs = make(map[string]pkg)
 	for _, path := range paths {
+		if c.excludeDir != nil && c.excludeDir.MatchString(path) {
+			c.logf("Excluding path: %s\n", path)
+			continue
+		}
+
 		p, err := c.parseDir(rev, path)
 		if err != nil {
 			// skip errors if we're recursing and the error is no buildable sources
@@ -211,6 +234,11 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 		pkgFiles []*ast.File
 	)
 	for _, file := range ipkg.GoFiles {
+		if c.excludeFile != nil && c.excludeFile.MatchString(file) {
+			c.logf("Excluding file: %s\n", file)
+			continue
+		}
+
 		contents, err := c.vcs.OpenFile(rev, filepath.Join(ipkg.Dir, file))
 		if err != nil {
 			return pkg{}, fmt.Errorf("could not read file %q at revision %q: %s", file, rev, err)
