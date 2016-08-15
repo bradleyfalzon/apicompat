@@ -88,12 +88,12 @@ func TestPaths(t *testing.T) {
 		path string // import path
 		exp  int    // expected number of changes
 	}{
-		{"", "example.com/lib", 58},
-		{"", "example.com/lib/...", 116},   // recursive
-		{"", "example.com/lib/b/...", 58},  // empty directory
-		{"example.com/lib", "", 58},        // working directory
-		{"example.com/lib", "./...", 116},  // working directory recursive
-		{"example.com/lib/b", "./...", 58}, // empty working directory
+		{"", "example.com/lib", 1},
+		{"", "example.com/lib/...", 2},    // recursive
+		{"", "example.com/lib/b/...", 1},  // empty directory
+		{"example.com/lib", "", 1},        // working directory
+		{"example.com/lib", "./...", 2},   // working directory recursive
+		{"example.com/lib/b", "./...", 1}, // empty working directory
 	}
 
 	oldPath := os.Getenv("GOPATH")

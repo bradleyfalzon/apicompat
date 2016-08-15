@@ -9,6 +9,10 @@ if [[ "$DIR" != 'testdata' ]]; then
     exit 1
 fi
 
+# Before/after is a simple application with a breaking change
+BEFORE="package testdata\n\nconst A int = 1"
+AFTER="package testdata\n\nconst A uint = 1"
+
 # Remove old dirs
 [[ -d gopath ]] && rm -rf gopath
 
@@ -20,13 +24,13 @@ git config --local user.name "testdata"
 git config --local user.email "testdata@example.com"
 
 # Initial commit
-cp ../before.go src/example.com/lib/testdata.go
-cp ../before.go src/example.com/lib/b/c/testdata.go
+echo -e $BEFORE > src/example.com/lib/testdata.go
+echo -e $BEFORE > src/example.com/lib/b/c/testdata.go
 git add .
 git commit -m '1st commit'
 
 # Second commit
-cat ../after.go > src/example.com/lib/testdata.go
-cat ../after.go > src/example.com/lib/b/c/testdata.go
+echo -e $AFTER > src/example.com/lib/testdata.go
+echo -e $AFTER > src/example.com/lib/b/c/testdata.go
 git add .
 git commit -m '2nd commit'
