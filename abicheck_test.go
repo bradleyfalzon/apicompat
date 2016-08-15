@@ -60,7 +60,8 @@ func TestParse(t *testing.T) {
 
 	// Compare results gold master
 	if !reflect.DeepEqual(exp, buf.Bytes()) {
-		t.Errorf("got:\n%v\nexp:\n%v\n", buf.String(), string(exp))
+		t.Errorf("results did not match testdata/exp.txt")
+		t.Errorf("run 'go test -args update && git diff testdata/exp.txt' to review")
 	}
 }
 

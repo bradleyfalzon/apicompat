@@ -141,6 +141,12 @@ type StructChangeMember struct {
 	Member1 uint
 }
 
+// StructRemPrivMember tests for ignorance in removal of private members
+type StructRemPrivMember struct {
+	// private* was removed
+	Public int
+}
+
 // StructChangePrivMember tests for ignorance in changes in private members
 type StructChangePrivMember struct {
 	private uint

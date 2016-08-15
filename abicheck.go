@@ -286,7 +286,12 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 
 // pkgDecls returns all declarations that need to be checked, this includes
 // all exported declarations as well as unexported types that are returned by
-// exported functions. Structs have both exported and unexported fields.
+// exported functions.
+//
+// Remove struct's private members and separate indentifier lists
+// into one per declaration.
+// from: struct { p1, p2 int, P3, P4 uint }
+// into: struct { P3 uint, P4 uint }
 func pkgDecls(files []*ast.File) map[string]ast.Decl {
 	var (
 		// exported values and functions
@@ -332,6 +337,22 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 					case *ast.TypeSpec:
 						// type struct/interface/etc
 						id = s.Name.Name
+
+						if stype, ok := s.Type.(*ast.StructType); ok {
+							if stype.Fields.List != nil {
+								var newList []*ast.Field
+								for _, field := range stype.Fields.List {
+									for _, fname := range field.Names {
+										fnew := &ast.Field{Doc: field.Doc, Type: field.Type, Tag: field.Tag, Comment: field.Comment}
+										if ast.IsExported(fname.Name) {
+											fnew.Names = []*ast.Ident{fname}
+											newList = append(newList, fnew)
+										}
+									}
+								}
+								stype.Fields.List = newList
+							}
+						}
 						decl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
 					case *ast.ImportSpec:
 						// ignore
