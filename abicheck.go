@@ -248,7 +248,7 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 
 		filename := file
 		if rev != revisionFS {
-			filename = rev + ":" + file
+			filename = rev + ":" + filepath.Join(ipkg.ImportPath, file)
 		}
 		src, err := parser.ParseFile(fset, filename, contents, 0)
 		if err != nil {
