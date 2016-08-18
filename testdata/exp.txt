@@ -95,7 +95,7 @@ rev2:abitest.go:-: breaking change members changed types
 	type IfaceChangeMemberReturn interface {
 		Member1(arg1 int) (ret1 int)
 	}
-rev2:abitest.go:-: non-breaking change members removed
+rev2:abitest.go:-: breaking change members removed
 	type IfaceRemMember interface {
 		Member1(arg1 int) (ret1 bool)
 	}

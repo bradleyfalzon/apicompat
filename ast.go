@@ -96,7 +96,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (DeclChange, error) {
 			switch btype := bspec.Type.(type) {
 			case *ast.InterfaceType:
 				atype := aspec.Type.(*ast.InterfaceType)
-				return c.checkInterface(btype, atype)
+				return c.checkInterface(btype, atype, disallowRemoval)
 			case *ast.StructType:
 				atype := aspec.Type.(*ast.StructType)
 				return c.checkStruct(btype, atype)
@@ -134,7 +134,17 @@ func (c DeclChecker) checkChan(before, after *ast.ChanType) (DeclChange, error) 
 	return none(), nil
 }
 
-func (c DeclChecker) checkInterface(before, after *ast.InterfaceType) (DeclChange, error) {
+const (
+	allowRemoval    = true
+	disallowRemoval = false
+)
+
+// checkInterface compares two interfaces for compatible changes, if
+// allowRemoval is true, members being removed will not be considered a
+// breaking change (such as function parameters accepting this interface)
+// if false, removal of members is a breaking change (such as exported
+// interface).
+func (c DeclChecker) checkInterface(before, after *ast.InterfaceType, allowRemoval bool) (DeclChange, error) {
 	// interfaces don't care if methods are removed
 	r := c.diffFields(before.Methods.List, after.Methods.List)
 	if r.Added() {
@@ -144,7 +154,10 @@ func (c DeclChecker) checkInterface(before, after *ast.InterfaceType) (DeclChang
 		// Fields changed types
 		return breaking("members changed types"), nil
 	} else if r.Removed() {
-		return nonBreaking("members removed"), nil
+		if allowRemoval {
+			return nonBreaking("members removed"), nil
+		}
+		return breaking("members removed"), nil
 	}
 
 	return none(), nil
@@ -266,7 +279,7 @@ func (d *diffResult) RemoveInterfaceCompatible(chkr DeclChecker) (msg string, er
 				return msg, err
 			}
 
-			change, err := chkr.checkInterface(bint, aint)
+			change, err := chkr.checkInterface(bint, aint, allowRemoval)
 			if err != nil {
 				return msg, err
 			}
