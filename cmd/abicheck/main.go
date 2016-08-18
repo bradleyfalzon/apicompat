@@ -13,7 +13,8 @@ func main() {
 	before := flag.String("before", "", "Compare revision before, leave unset for the VCS default or . to bypass VCS and use filesystem version")
 	after := flag.String("after", "", "Compare revision after, leave unset for the VCS default or . to bypass VCS and use filesystem version")
 	excludeFile := flag.String("exclude-file", "", "Exclude files based on regexp pattern")
-	excludeDir := flag.String("exclude-ipath", "", "Exclude directory based on regexp pattern")
+	excludeDir := flag.String("exclude-dir", "", "Exclude directory based on regexp pattern")
+	allChanges := flag.Bool("all", false, "Show all changes, not just breaking")
 	verbose := flag.Bool("v", false, "Enable verbose logging")
 	flag.Parse()
 	path := flag.Arg(0)
@@ -44,6 +45,8 @@ func main() {
 	}
 
 	for _, change := range changes {
-		fmt.Println(change)
+		if *allChanges || change.Change == abicheck.Breaking {
+			fmt.Println(change)
+		}
 	}
 }

@@ -35,7 +35,7 @@ and arguments for the command line tool.
 -before revision           - Revisions to check as before  (default: if unstaged changes, check those, else check last two commits)
 -after  revision           - Revisions to check as after   (default: if unstaged changes, check those, else check last two commits)
 -vcsDir path               - Path to root VCS directory    (default: let VCS tool search)
--nonBreaking               - Show non-breaking changes as well as breaking (default: false)
+-all                       - Show non-breaking changes as well as breaking (default: false)
 
 abicheck        # current package only
 abicheck ./...  # check subdirectory packages
