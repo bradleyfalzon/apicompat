@@ -424,11 +424,11 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 
 		// Find exported functions with unexported receivers that also need to be checked
 		for rid, decl := range priv {
-			// len(type)+1 to account for dot separator
-			if len(rid) <= len(id)+1 {
+			dotIndex := strings.IndexRune(rid, '.')
+			if dotIndex < 0 {
 				continue
 			}
-			pid, pfunc := rid[:len(id)], rid[len(id)+1:]
+			pid, pfunc := rid[:dotIndex], rid[dotIndex+1:]
 			if id == pid && ast.IsExported(pfunc) {
 				decls[rid] = decl
 			}
