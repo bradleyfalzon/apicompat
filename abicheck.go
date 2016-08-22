@@ -340,20 +340,9 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 						// type struct/interface/etc
 						id = s.Name.Name
 
+						// If struct, expand multiple names for a type and remove unexported
 						if stype, ok := s.Type.(*ast.StructType); ok {
-							if stype.Fields.List != nil {
-								var newList []*ast.Field
-								for _, field := range stype.Fields.List {
-									for _, fname := range field.Names {
-										fnew := &ast.Field{Doc: field.Doc, Type: field.Type, Tag: field.Tag, Comment: field.Comment}
-										if ast.IsExported(fname.Name) {
-											fnew.Names = []*ast.Ident{fname}
-											newList = append(newList, fnew)
-										}
-									}
-								}
-								stype.Fields.List = newList
-							}
+							expandFieldList(stype.Fields, true)
 						}
 						decl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
 					case *ast.ImportSpec:
@@ -435,6 +424,31 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 		}
 	}
 	return decls
+}
+
+// expandFieldList expands a ast.FieldList's shorthand notation:
+// (a, b int) to (a int, b int). If removeExported is true, only exported
+// idents are returned.
+func expandFieldList(fl *ast.FieldList, removeExported bool) {
+	if fl == nil || fl.List == nil {
+		return
+	}
+	var newList []*ast.Field
+	for _, field := range fl.List {
+		fnew := &ast.Field{Doc: field.Doc, Type: field.Type, Tag: field.Tag, Comment: field.Comment}
+		if len(field.Names) == 0 {
+			// Unnamed type, like func() error {}
+			newList = append(newList, fnew)
+		}
+		for _, fname := range field.Names {
+			if ast.IsExported(fname.Name) || !removeExported {
+				fnew.Names = []*ast.Ident{fname}
+				newList = append(newList, fnew)
+			}
+		}
+	}
+	fl.List = newList
+	return
 }
 
 // Change is the ast declaration containing the before and after
