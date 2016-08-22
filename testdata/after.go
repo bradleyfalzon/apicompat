@@ -74,6 +74,9 @@ var VarChangeTypeChanDirRelax chan int
 // VarChangeTypeFunc detects support for var funcs
 var VarChangeTypeFunc func(arg1 int) (err error)
 
+// VarChangeTypeFuncInferredtests for ignorance of shorthand type syntax
+var VarChangeTypeFuncInferred func(arg1, arg2 int) (ret1, ret2 bool)
+
 // VarChangeTypeFuncArgRename detects ignorance of argument name changes
 var VarChangeTypeFuncArgRename func(arg2 int) (err2 error)
 
@@ -154,6 +157,11 @@ type StructChangePrivMember struct {
 	private uint
 }
 
+// IfaceInferred tests for ignorance of shorthand type syntax
+type IfaceInferred interface {
+	Member1(arg1, arg2 int) (ret1, ret2 bool)
+}
+
 // IfaceAddMember detects additions of interface methods
 type IfaceAddMember interface {
 	Member1(arg1 int) (ret1 bool)
@@ -191,6 +199,9 @@ func FuncArgPtr(arg1 *int)                {}
 func FuncArgPkg(arg1 bytes.Buffer)        {}
 func FuncArgPtrPkg(arg1 *bytes.Buffer)    {}
 func FuncArgFuncPkg(func(A bytes.Buffer)) {}
+
+// FuncInferred tests for ignorance of shorthand type syntax
+func FuncInferred(arg1, arg2 int) (ret1, ret2 bool) {}
 
 // FuncRenameArg tests ignorance of changes in variable names
 func FuncRenameArg(arg2 int) (ret2 error) {}

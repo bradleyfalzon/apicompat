@@ -340,9 +340,15 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 						// type struct/interface/etc
 						id = s.Name.Name
 
-						// If struct, expand multiple names for a type and remove unexported
-						if stype, ok := s.Type.(*ast.StructType); ok {
-							expandFieldList(stype.Fields, true)
+						// Expand multiple names for a type and remove unexported from structs
+						switch t := s.Type.(type) {
+						case *ast.StructType:
+							expandFieldList(t.Fields, true)
+						case *ast.InterfaceType:
+							for _, m := range t.Methods.List {
+								expandFieldList(m.Type.(*ast.FuncType).Params, false)
+								expandFieldList(m.Type.(*ast.FuncType).Results, false)
+							}
 						}
 						decl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
 					case *ast.ImportSpec:
@@ -375,6 +381,11 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 					id = recv + "." + id
 				}
 				astDecl.(*ast.FuncDecl).Body = nil
+
+				// Expand the shorthand type notation
+				expandFieldList(d.Type.Params, false)
+				expandFieldList(d.Type.Results, false)
+
 				// If it's exported and it's either not a receiver OR the receiver is also exported
 				if ast.IsExported(d.Name.Name) && (recv == "" || ast.IsExported(recv)) {
 					// We're not interested in the body, nil it, alternatively we could set an
