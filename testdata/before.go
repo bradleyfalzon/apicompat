@@ -144,6 +144,11 @@ type StructChangeMember struct {
 	Member1 int
 }
 
+// StructInferredMember checks for support of shorthand types
+type StructChangeInferredMember struct {
+	Member1, Member2 int
+}
+
 // StructRemPrivMember tests for ignorance in removal of private members
 type StructRemPrivMember struct {
 	private1, // will be removed

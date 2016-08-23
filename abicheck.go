@@ -448,15 +448,16 @@ func expandFieldList(fl *ast.FieldList, removeExported bool) {
 	}
 	var newList []*ast.Field
 	for _, field := range fl.List {
-		fnew := &ast.Field{Doc: field.Doc, Type: field.Type, Tag: field.Tag, Comment: field.Comment}
+		fnew := ast.Field{Doc: field.Doc, Type: field.Type, Tag: field.Tag, Comment: field.Comment}
 		if len(field.Names) == 0 {
 			// Unnamed type, like func() error {}
-			newList = append(newList, fnew)
+			newList = append(newList, &fnew)
 		}
 		for _, fname := range field.Names {
+			fcopy := fnew
 			if ast.IsExported(fname.Name) || !removeExported {
-				fnew.Names = []*ast.Ident{fname}
-				newList = append(newList, fnew)
+				fcopy.Names = []*ast.Ident{fname}
+				newList = append(newList, &fcopy)
 			}
 		}
 	}
