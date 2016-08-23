@@ -157,6 +157,11 @@ type StructChangePrivMember struct {
 	private uint
 }
 
+// IfaceEmbed checks for support of interfaces with embedded values
+type IfaceEmbed interface {
+	io.Reader
+}
+
 // IfaceInferred tests for ignorance of shorthand type syntax
 type IfaceInferred interface {
 	Member1(arg1, arg2 int) (ret1, ret2 bool)

@@ -346,8 +346,10 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 							expandFieldList(t.Fields, true)
 						case *ast.InterfaceType:
 							for _, m := range t.Methods.List {
-								expandFieldList(m.Type.(*ast.FuncType).Params, false)
-								expandFieldList(m.Type.(*ast.FuncType).Results, false)
+								if ftype, ok := m.Type.(*ast.FuncType); ok {
+									expandFieldList(ftype.Params, false)
+									expandFieldList(ftype.Results, false)
+								}
 							}
 						}
 						decl = &ast.GenDecl{Tok: d.Tok, Specs: []ast.Spec{s}}
