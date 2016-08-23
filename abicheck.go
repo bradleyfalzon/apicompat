@@ -175,6 +175,10 @@ func (c Checker) parse(rev string) (pkgs map[string]pkg, err error) {
 			c.logf("Excluding path: %s\n", path)
 			continue
 		}
+		if strings.Contains(path, "internal/") || strings.Contains(path, "vendor/") {
+			c.logf("Excluding path: %s\n", path)
+			continue
+		}
 
 		p, err := c.parseDir(rev, path)
 		if err != nil {

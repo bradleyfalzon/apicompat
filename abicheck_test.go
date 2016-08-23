@@ -81,7 +81,7 @@ func TestPaths(t *testing.T) {
 	cmd.Dir = testdataDir
 	err = cmd.Run()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("error executing make.sh: %s", err)
 	}
 
 	tests := []struct {
@@ -90,10 +90,10 @@ func TestPaths(t *testing.T) {
 		exp  int    // expected number of changes
 	}{
 		{"", "example.com/lib", 1},
-		{"", "example.com/lib/...", 2},    // recursive
+		{"", "example.com/lib/...", 2},    // recursive and ignore internal/vendor
 		{"", "example.com/lib/b/...", 1},  // empty directory
 		{"example.com/lib", "", 1},        // working directory
-		{"example.com/lib", "./...", 2},   // working directory recursive
+		{"example.com/lib", "./...", 2},   // working directory recursive and ignore internal/vendor
 		{"example.com/lib/b", "./...", 1}, // empty working directory
 	}
 

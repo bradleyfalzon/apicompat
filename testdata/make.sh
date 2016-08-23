@@ -17,7 +17,7 @@ AFTER="package testdata\n\nconst A uint = 1"
 [[ -d gopath ]] && rm -rf gopath
 
 # Initialise
-mkdir -p gopath/src/example.com/lib/b/c/
+mkdir -p gopath/src/example.com/lib/{b,internal,vendor}/c/
 cd gopath
 git init
 git config --local user.name "testdata"
@@ -26,11 +26,15 @@ git config --local user.email "testdata@example.com"
 # Initial commit
 echo -e $BEFORE > src/example.com/lib/testdata.go
 echo -e $BEFORE > src/example.com/lib/b/c/testdata.go
+echo -e $BEFORE > src/example.com/lib/internal/c/testdata.go
+echo -e $BEFORE > src/example.com/lib/vendor/c/testdata.go
 git add .
 git commit -m '1st commit'
 
 # Second commit
 echo -e $AFTER > src/example.com/lib/testdata.go
 echo -e $AFTER > src/example.com/lib/b/c/testdata.go
+echo -e $AFTER > src/example.com/lib/internal/c/testdata.go
+echo -e $AFTER > src/example.com/lib/vendor/c/testdata.go
 git add .
 git commit -m '2nd commit'
