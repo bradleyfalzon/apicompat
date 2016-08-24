@@ -134,9 +134,23 @@ type StructAddMember struct {
 	Member2 []int
 }
 
+// StructEmbedAddMember detects additions of struct fields with embedded fields (is not a problem)
+type StructEmbedAddMember struct {
+	Member1 int
+	Struct
+	*StructPtr
+	bytes.Buffer
+	*bytes.Reader
+}
+
 // StructRemMember detects removals of struct fields
 type StructRemMember struct {
 	//Member1 was removed
+}
+
+// StructRemEmbed detects removals of embeddedstruct fields
+type StructRemEmbed struct {
+	//Struct was removed
 }
 
 // StructChangeMember detects changes of struct fields

@@ -146,7 +146,7 @@ const (
 // interface).
 func (c DeclChecker) checkInterface(before, after *ast.InterfaceType, allowRemoval bool) (DeclChange, error) {
 	// interfaces don't care if methods are removed
-	r := c.diffFields(before.Methods.List, after.Methods.List)
+	r := c.diffFields(keyOnName, before.Methods.List, after.Methods.List)
 	if r.Added() {
 		// Fields were added
 		return breaking("members added"), nil
@@ -165,7 +165,7 @@ func (c DeclChecker) checkInterface(before, after *ast.InterfaceType, allowRemov
 
 func (c DeclChecker) checkStruct(before, after *ast.StructType) (DeclChange, error) {
 	// structs don't care if fields were added
-	r := c.diffFields(before.Fields.List, after.Fields.List)
+	r := c.diffFields(keyOnName, before.Fields.List, after.Fields.List)
 	if r.Removed() {
 		// Fields were removed
 		return breaking("members removed"), nil
@@ -183,7 +183,7 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (DeclChange, error) 
 	bparams := stripNames(before.Params.List)
 	aparams := stripNames(after.Params.List)
 
-	r := c.diffFields(bparams, aparams)
+	r := c.diffFields(keyOnPosition, bparams, aparams)
 	variadicMsg := r.RemoveVariadicCompatible(c)
 	interfaceMsg, err := r.RemoveInterfaceCompatible(c)
 	if err != nil {
@@ -206,7 +206,7 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (DeclChange, error) 
 		// Adding return parameters to a function, when it didn't have any before is
 		// ok, so only check if for breaking changes if there was parameters before
 		if len(before.Results.List) > 0 {
-			r := c.diffFields(bresults, aresults)
+			r := c.diffFields(keyOnPosition, bresults, aresults)
 			if r.Changed() {
 				return breaking("return parameters changed"), nil
 			}
@@ -319,17 +319,24 @@ func stripNames(fields []*ast.Field) []*ast.Field {
 	return stripped
 }
 
-func (c DeclChecker) diffFields(before, after []*ast.Field) diffResult {
+type keyOn int
+
+const (
+	keyOnPosition keyOn = iota
+	keyOnName
+)
+
+func (c DeclChecker) diffFields(keyOn keyOn, before, after []*ast.Field) diffResult {
 	// Presort after for quicker matching of fieldname -> type, may not be worthwhile
 	AfterMembers := make(map[string]*ast.Field)
 	for i, field := range after {
-		AfterMembers[fieldKey(field, i)] = field
+		AfterMembers[fieldKey(keyOn, field, i)] = field
 	}
 
 	var r diffResult
 
 	for i, bfield := range before {
-		bkey := fieldKey(bfield, i)
+		bkey := fieldKey(keyOn, bfield, i)
 		if afield, ok := AfterMembers[bkey]; ok {
 			if !c.exprEqual(bfield.Type, afield.Type) {
 				// modified
@@ -351,15 +358,38 @@ func (c DeclChecker) diffFields(before, after []*ast.Field) diffResult {
 	return r
 }
 
-// Return an appropriate identifier for a field, if it has an ident (name)
-// such as in the case of a struct/interface member, else, use it's provided
-// position i, such as the case of a function's parameter or result list
-func fieldKey(field *ast.Field, i int) string {
-	if len(field.Names) > 0 {
+// Return the identifier for a field, this is used to support positions
+// changing (in the case of struct/interface) but not a function where position
+// matters.
+func fieldKey(keyOn keyOn, field *ast.Field, pos int) string {
+	switch keyOn {
+	case keyOnPosition:
+		return strconv.Itoa(pos)
+	case keyOnName:
+		if len(field.Names) == 0 {
+			// could be embedded struct/interface, use the type instead
+			return nameToString(field.Type)
+		}
 		return field.Names[0].Name
 	}
-	// No name, probably a function, return position
-	return strconv.Itoa(i)
+	panic(fmt.Sprintf("fieldKey: unknown position: %v", keyOn))
+}
+
+func nameToString(expr ast.Expr) string {
+	switch etype := expr.(type) {
+	case *ast.StarExpr:
+		switch estar := etype.X.(type) {
+		case *ast.SelectorExpr:
+			return fmt.Sprintf("*%s.%s", estar.X, estar.Sel)
+		case *ast.Ident:
+			return "*" + estar.Name
+		}
+	case *ast.SelectorExpr:
+		return fmt.Sprintf("%s.%s", etype.X, etype.Sel)
+	case *ast.Ident:
+		return etype.Name
+	}
+	panic(fmt.Sprintf("unknown expr type: %T", expr))
 }
 
 // exprEqual compares two ast.Expr to determine if they are equal

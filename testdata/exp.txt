@@ -109,6 +109,23 @@ rev2:github.com/bradleyfalzon/abicheck/abitest.go:-: non-breaking change members
 rev2:github.com/bradleyfalzon/abicheck/abitest.go:-: breaking change members changed types
 	type StructChangeMember struct{ Member1 int }
 	type StructChangeMember struct{ Member1 uint }
+rev2:github.com/bradleyfalzon/abicheck/abitest.go:-: non-breaking change members added
+	type StructEmbedAddMember struct {
+		Struct
+		*StructPtr
+		bytes.Buffer
+		*bytes.Reader
+	}
+	type StructEmbedAddMember struct {
+		Member1	int
+		Struct
+		*StructPtr
+		bytes.Buffer
+		*bytes.Reader
+	}
+rev2:github.com/bradleyfalzon/abicheck/abitest.go:-: breaking change members removed
+	type StructRemEmbed struct{ Struct }
+	type StructRemEmbed struct{}
 rev2:github.com/bradleyfalzon/abicheck/abitest.go:-: breaking change members removed
 	type StructRemMember struct{ Member1 int }
 	type StructRemMember struct{}
