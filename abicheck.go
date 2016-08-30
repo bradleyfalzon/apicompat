@@ -443,10 +443,11 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 	return decls
 }
 
-// expandFieldList expands a ast.FieldList's shorthand notation:
-// (a, b int) to (a int, b int). If removeExported is true, only exported
-// idents are returned.
-func expandFieldList(fl *ast.FieldList, removeExported bool) {
+// expandFieldList expands an ast.FieldList's shorthand notation:
+// (a, b int) to (a int, b int). A ast.FieldList could be function's signature
+// struct, interface etc. If isStruct is true, only exported idents are
+// returned.
+func expandFieldList(fl *ast.FieldList, isStruct bool) {
 	if fl == nil || fl.List == nil {
 		return
 	}
@@ -454,12 +455,14 @@ func expandFieldList(fl *ast.FieldList, removeExported bool) {
 	for _, field := range fl.List {
 		fnew := ast.Field{Doc: field.Doc, Type: field.Type, Tag: field.Tag, Comment: field.Comment}
 		if len(field.Names) == 0 {
-			// Unnamed type, like func() error {}
-			newList = append(newList, &fnew)
+			// Unnamed type, like func() error {}, embedded struct etc
+			if keepField(field.Type, isStruct) {
+				newList = append(newList, &fnew)
+			}
 		}
 		for _, fname := range field.Names {
-			fcopy := fnew
-			if ast.IsExported(fname.Name) || !removeExported {
+			if keepField(fname, isStruct) {
+				fcopy := fnew
 				fcopy.Names = []*ast.Ident{fname}
 				newList = append(newList, &fcopy)
 			}
@@ -467,6 +470,32 @@ func expandFieldList(fl *ast.FieldList, removeExported bool) {
 	}
 	fl.List = newList
 	return
+}
+
+func keepField(expr ast.Expr, isStruct bool) bool {
+	if !isStruct {
+		// Keep all fields
+		return true
+	}
+
+	// This is a expr from a struct, only keep the fields that are exported.
+	// SelectorExpr is always exported, as it wouldn't be accessible otherwise.
+
+	switch etype := expr.(type) {
+	case *ast.StarExpr:
+		switch estar := etype.X.(type) {
+		case *ast.SelectorExpr:
+			return true
+		case *ast.Ident:
+			return ast.IsExported(estar.Name)
+		}
+	case *ast.SelectorExpr:
+		return true
+	case *ast.Ident:
+		//
+		return ast.IsExported(etype.Name)
+	}
+	panic("this shouldn't happen") // if i had a dollar every time i heard this
 }
 
 // Change is the ast declaration containing the before and after

@@ -148,9 +148,16 @@ type StructRemMember struct {
 	//Member1 was removed
 }
 
-// StructRemEmbed detects removals of embeddedstruct fields
+// StructRemEmbed detects removals of embedded struct fields
 type StructRemEmbed struct {
 	//Struct was removed
+}
+
+//type structPriv struct{} removed
+
+// StructRemPrivEmbed tests for ignorance in removal of elds
+type StructRemPrivEmbed struct {
+	//structPriv was removed
 }
 
 // StructChangeMember detects changes of struct fields
