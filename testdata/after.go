@@ -188,6 +188,16 @@ type IfaceEmbed interface {
 	io.Reader
 }
 
+// IfaceEmbedResolve tests for ignorance of embedded to non embedded of same signature
+type IfaceEmbedResolve interface {
+	Read(p []byte) (n int, err error)
+}
+
+// IfaceEmbedCompact tests for ignorance of non embedded to embedded of same signature
+type IfaceEmbedCompact interface {
+	io.Reader
+}
+
 // IfaceInferred tests for ignorance of shorthand type syntax
 type IfaceInferred interface {
 	Member1(arg1, arg2 int) (ret1, ret2 bool)

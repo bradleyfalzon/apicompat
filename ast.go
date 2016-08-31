@@ -145,7 +145,16 @@ const (
 // if false, removal of members is a breaking change (such as exported
 // interface).
 func (c DeclChecker) checkInterface(before, after *ast.InterfaceType, allowRemoval bool) (DeclChange, error) {
-	// interfaces don't care if methods are removed
+	// Resolving embedded interfaces to their signatures skips false positives
+	// when switching between an embedded type to their equivalent non embedded
+	// eg, from embedded Reader to Read(p []byte) (n int, err error)
+	if err := resolveInterface(c.binfo.Uses, before); err != nil {
+		return none(), err
+	}
+	if err := resolveInterface(c.ainfo.Uses, after); err != nil {
+		return none(), err
+	}
+
 	r := c.diffFields(keyOnName, before.Methods.List, after.Methods.List)
 	if r.Added() {
 		// Fields were added
@@ -161,6 +170,31 @@ func (c DeclChecker) checkInterface(before, after *ast.InterfaceType, allowRemov
 	}
 
 	return none(), nil
+}
+
+// resolveInterface resolves and rewrites an interfaces embedded members.
+// i.e. given an io.ReadCloser, it will return Read(p []byte) (int, error) and
+// Close() error
+func resolveInterface(uses map[*ast.Ident]types.Object, iface *ast.InterfaceType) error {
+	var rmi []int
+	for i, m := range iface.Methods.List {
+		if len(m.Names) > 0 {
+			continue
+		}
+		newIface, err := exprInterfaceType(uses, m.Type)
+		if err != nil {
+			return err
+		}
+		iface.Methods.List = append(iface.Methods.List, newIface.Methods.List...)
+		rmi = append(rmi, i)
+	}
+
+	// After adding the signatures, remove the embedded interface
+	for i := len(rmi) - 1; i >= 0; i-- {
+		iface.Methods.List = append(iface.Methods.List[:i], iface.Methods.List[i+1:]...)
+	}
+
+	return nil
 }
 
 func (c DeclChecker) checkStruct(before, after *ast.StructType) (DeclChange, error) {
@@ -417,6 +451,11 @@ func (c DeclChecker) exprEqual(before, after ast.Expr) bool {
 	// Also compare types with types.TypeString to ignore any import aliases
 	btype := c.binfo.TypeOf(before)
 	atype := c.ainfo.TypeOf(after)
+	if btype == nil || atype == nil {
+		// Maybe nil when using exprInterfaceType which converts ast to string
+		// and back to ast, without type checker knowing.
+		return types.ExprString(before) == types.ExprString(after)
+	}
 	return types.TypeString(btype, nil) == types.TypeString(atype, nil)
 }
 
