@@ -99,9 +99,13 @@ func TestPaths(t *testing.T) {
 
 	oldPath := os.Getenv("GOPATH")
 	defer func() {
-		os.Setenv("GOPATH", oldPath)
+		if err := os.Setenv("GOPATH", oldPath); err != nil {
+			t.Fatalf("cannot setenv in defer: %s", err)
+		}
 	}()
-	os.Setenv("GOPATH", filepath.Join(testdataDir, "gopath"))
+	if err := os.Setenv("GOPATH", filepath.Join(testdataDir, "gopath")); err != nil {
+		t.Fatalf("cannot setenv: %s", err)
+	}
 
 	for _, test := range tests {
 		t.Logf("Test: %#v", test)

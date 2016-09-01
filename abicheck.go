@@ -116,8 +116,8 @@ func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "error comparing declarations: %s\n", err)
 		if derr, ok := err.(*diffError); ok {
-			ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
-			ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)
+			_ = ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
+			_ = ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)
 		}
 		return nil, errors.New(buf.String())
 	}
