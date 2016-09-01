@@ -170,6 +170,7 @@ func (v *StrVCS) SetFile(revision, path string, contents []byte) {
 	v.files[revision][path] = contents
 }
 
+// ReadDir implements VCS.ReadDir
 func (v StrVCS) ReadDir(revision, path string) (files []os.FileInfo, err error) {
 	for file := range v.files[revision] {
 		files = append(files, fileInfo{
@@ -179,10 +180,12 @@ func (v StrVCS) ReadDir(revision, path string) (files []os.FileInfo, err error) 
 	return files, nil
 }
 
+// OpenFile implements VCS.OpenFile
 func (v StrVCS) OpenFile(revision, path string) (io.ReadCloser, error) {
 	return ioutil.NopCloser(bytes.NewReader(v.files[revision][filepath.Base(path)])), nil
 }
 
+// DefaultRevision implements VCS.DefaultRevision
 func (StrVCS) DefaultRevision() (string, string) {
 	return "rev1", "rev2"
 }

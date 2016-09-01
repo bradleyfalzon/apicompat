@@ -75,7 +75,9 @@ func SetExcludeDir(pattern string) func(*Checker) {
 	}
 }
 
-// Blank revision means use VCSs default
+// Check an import path and before and after revision for changes. Import path
+// maybe empty, if so, the current working directory will be used. If a
+// revision is blank, the default VCS revision is used.
 func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
 	// If revision is unset use VCS's default revision
 	dBefore, dAfter := c.vcs.DefaultRevision()
@@ -116,8 +118,8 @@ func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "error comparing declarations: %s\n", err)
 		if derr, ok := err.(*diffError); ok {
-			ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
-			ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)
+			_ = ast.Fprint(&buf, c.b[derr.pkg].fset, derr.bdecl, ast.NotNilFilter)
+			_ = ast.Fprint(&buf, c.a[derr.pkg].fset, derr.adecl, ast.NotNilFilter)
 		}
 		return nil, errors.New(buf.String())
 	}
@@ -372,7 +374,7 @@ func pkgDecls(files []*ast.File) map[string]ast.Decl {
 			case *ast.FuncDecl:
 				// function or method
 				var (
-					id   string = d.Name.Name
+					id   = d.Name.Name
 					recv string
 				)
 				// check if we have a receiver (and not just `func () Method() {}`)
