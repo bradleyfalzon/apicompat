@@ -1,4 +1,4 @@
-package abicheck
+package apicompat
 
 import (
 	"errors"

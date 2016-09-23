@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bradleyfalzon/abicheck"
+	"github.com/bradleyfalzon/apicompat"
 )
 
 func main() {
@@ -20,32 +20,32 @@ func main() {
 	path := flag.Arg(0)
 
 	// TODO make it auto discover
-	git, err := abicheck.NewGit()
+	git, err := apicompat.NewGit()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "abicheck: %s\n", err)
+		fmt.Fprintf(os.Stderr, "apicompat: %s\n", err)
 		os.Exit(2)
 	}
 
-	args := []func(*abicheck.Checker){abicheck.SetVCS(git)}
+	args := []func(*apicompat.Checker){apicompat.SetVCS(git)}
 	if *verbose {
-		args = append(args, abicheck.SetVLog(os.Stdout))
+		args = append(args, apicompat.SetVLog(os.Stdout))
 	}
 	if *excludeFile != "" {
-		args = append(args, abicheck.SetExcludeFile(*excludeFile))
+		args = append(args, apicompat.SetExcludeFile(*excludeFile))
 	}
 	if *excludeDir != "" {
-		args = append(args, abicheck.SetExcludeDir(*excludeDir))
+		args = append(args, apicompat.SetExcludeDir(*excludeDir))
 	}
 
-	checker := abicheck.New(args...)
+	checker := apicompat.New(args...)
 	changes, err := checker.Check(path, *before, *after)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "abicheck: %s\n", err)
+		fmt.Fprintf(os.Stderr, "apicompat: %s\n", err)
 		os.Exit(1)
 	}
 
 	for _, change := range changes {
-		if *allChanges || change.Change == abicheck.Breaking {
+		if *allChanges || change.Change == apicompat.Breaking {
 			fmt.Println(change)
 		}
 	}

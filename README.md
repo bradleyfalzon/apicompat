@@ -1,10 +1,10 @@
 # Introduction
 
-[![Build Status](https://travis-ci.org/bradleyfalzon/abicheck.svg?branch=master)](https://travis-ci.org/bradleyfalzon/abicheck) [![Coverage Status](https://coveralls.io/repos/github/bradleyfalzon/abicheck/badge.svg?branch=master)](https://coveralls.io/github/bradleyfalzon/abicheck?branch=master) [![GoDoc](https://godoc.org/github.com/bradleyfalzon/abicheck?status.svg)](https://godoc.org/github.com/bradleyfalzon/abicheck)
+[![Build Status](https://travis-ci.org/bradleyfalzon/apicompat.svg?branch=master)](https://travis-ci.org/bradleyfalzon/apicompat) [![Coverage Status](https://coveralls.io/repos/github/bradleyfalzon/apicompat/badge.svg?branch=master)](https://coveralls.io/github/bradleyfalzon/apicompat?branch=master) [![GoDoc](https://godoc.org/github.com/bradleyfalzon/apicompat?status.svg)](https://godoc.org/github.com/bradleyfalzon/apicompat)
 
-`abicheck` is a tool to check for the introduction of backwards incompatible changes.
+`apicompat` is a tool to check for the introduction of backwards incompatible changes.
 
-`abicheck`:
+`apicompat`:
 - Guarantees that all consumers of a library will still build without failure
 - Only checks exported declarations
 - There are no false positives (if there are, it's a bug)
@@ -12,6 +12,7 @@
     be considered by the library author
 - Can be simply consumed as a library
 - Is in its infancy, see [Status](#status), feedback and review appreciated
+- Was originally named `abicheck` during early development
 
 Secondary tasks could include:
 - Detecting current semver and suggesting an appropriate increase
@@ -20,14 +21,14 @@ Secondary tasks could include:
 Try at [abicheck.bradleyf.id.au](https://abicheck.bradleyf.id.au/) or via CLI:
 
 ```
-go get -u github.com/bradleyfalzon/abicheck/cmd/abicheck
+go get -u github.com/bradleyfalzon/apicompat/cmd/apicompat
 cd /your/project/dir/with/committed/changes
-abicheck
+apicompat
 ```
 
 # Proposed Arguments
 
-`abicheck` also comes with a command line tool, as well as being used as a library, the following are the proposed flags
+`apicompat` also comes with a command line tool, as well as being used as a library, the following are the proposed flags
 and arguments for the command line tool.
 
 ```
@@ -37,8 +38,8 @@ and arguments for the command line tool.
 -vcsDir path               - Path to root VCS directory    (default: let VCS tool search)
 -all                       - Show non-breaking changes as well as breaking (default: false)
 
-abicheck        # current package only
-abicheck ./...  # check subdirectory packages
+apicompat        # current package only
+apicompat ./...  # check subdirectory packages
 ```
 
 Another tool, called `abichanges` may also be included which will list all detected changes to assist in producing
@@ -46,7 +47,7 @@ release notes.
 
 # Status
 
-`abicheck` is currently under heavy development and refactoring. This initial version was a proof of concept and shortcuts were taken. The current tasks are focused on (but not limited to):
+`apicompat` is currently under heavy development and refactoring. This initial version was a proof of concept and shortcuts were taken. The current tasks are focused on (but not limited to):
 
 - Adding Mercurial, SVN and potentially other VCS systems
 - Improve VCS options such as:
@@ -67,10 +68,10 @@ and `after.go`, which are before and after versions of a test package, each time
 
 If adding new test cases, you should expect the test to fail as the code changes should create a difference with `exp.txt`.
 Then, you'll need to update the golden master (see below), and commit those changes. If you add a new test case to `before.go` and
-`after.go`, and the tests still pass, you've uncovered a bug within `abicheck` which will need a code change to fix, once
+`after.go`, and the tests still pass, you've uncovered a bug within `apicompat` which will need a code change to fix, once
 code has change, the tests should fail, so update the master, review all your changes and commit.
 
 - This uses golden master `testdata/exp.txt` for the tests
 - Run tests with: `go test`
 - Update master with: `go test -args update`
-- Alternatively to do a test run: `go install && ( cd testgit; ./make.sh && abicheck )`
+- Alternatively to do a test run: `go install && ( cd testgit; ./make.sh && apicompat )`
