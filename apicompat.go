@@ -216,7 +216,7 @@ func (c Checker) getDirsRecursive(base, rev, rel, prefix string) (dirs []string)
 
 func (c Checker) parseDir(rev, dir string) (pkg, error) {
 
-	// Use go/build to get the list of files relevant for a specfic OS and ARCH
+	// Use go/build to get the list of files relevant for a specific OS and ARCH
 
 	ctx := build.Default
 	ctx.ReadDir = func(dir string) ([]os.FileInfo, error) {
