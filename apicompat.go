@@ -25,8 +25,8 @@ import (
 const cwd = "."
 
 var (
-	// ErrSkipPackage is returned by the parser when a package should be skipped.
-	ErrSkipPackage = errors.New("Skipping package")
+	// errSkipPackage is returned by the parser when a package should be skipped.
+	errSkipPackage = errors.New("Skipping package")
 )
 
 // Checker is used to check for changes between two versions of a package.
@@ -189,7 +189,7 @@ func (c Checker) parse(rev string) (pkgs map[string]pkg, err error) {
 
 		p, err := c.parseDir(rev, path)
 		if err != nil {
-			if err == ErrSkipPackage {
+			if err == errSkipPackage {
 				continue
 			}
 			// skip errors if we're recursing and the error is no buildable sources
@@ -232,6 +232,7 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 	ctx.OpenFile = func(path string) (io.ReadCloser, error) {
 		return c.vcs.OpenFile(rev, path)
 	}
+	ctx.GOPATH = os.Getenv("GOPATH")
 
 	// wd is for relative imports, such as "."
 	wd, err := os.Getwd()
@@ -244,7 +245,7 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 	}
 
 	if ipkg.Name == "main" {
-		return pkg{}, ErrSkipPackage
+		return pkg{}, errSkipPackage
 	}
 
 	var (
