@@ -18,9 +18,14 @@ func main() {
 	verbose := flag.Bool("v", false, "Enable verbose logging")
 	flag.Parse()
 	path := flag.Arg(0)
+	rel, rec, err := apicompat.RelativePathToTarget(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	// TODO make it auto discover
-	git, err := apicompat.NewGit()
+	git, err := apicompat.NewGit(rel)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "apicompat: %s\n", err)
 		os.Exit(2)
@@ -38,7 +43,7 @@ func main() {
 	}
 
 	checker := apicompat.New(args...)
-	changes, err := checker.Check(path, *before, *after)
+	changes, err := checker.Check(rel, rec, *before, *after)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "apicompat: %s\n", err)
 		os.Exit(1)

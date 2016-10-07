@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -27,6 +28,9 @@ const cwd = "."
 var (
 	// errSkipPackage is returned by the parser when a package should be skipped.
 	errSkipPackage = errors.New("Skipping package")
+	// errImportPathNotFound is returned when the import path cannot be found in
+	// any GOPATH.
+	errImportPathNotFound = errors.New("import path not found")
 )
 
 // Checker is used to check for changes between two versions of a package.
@@ -83,7 +87,7 @@ func SetExcludeDir(pattern string) func(*Checker) {
 // Check an import path and before and after revision for changes. Import path
 // maybe empty, if so, the current working directory will be used. If a
 // revision is blank, the default VCS revision is used.
-func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
+func (c *Checker) Check(rel string, recurse bool, beforeRev, afterRev string) ([]Change, error) {
 	// If revision is unset use VCS's default revision
 	dBefore, dAfter := c.vcs.DefaultRevision()
 	if beforeRev == "" {
@@ -92,27 +96,24 @@ func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
 	if afterRev == "" {
 		afterRev = dAfter
 	}
+	c.recurse = recurse
 
-	// If path is unset, use local directory
-	c.path = path
-	if path == "" {
-		c.path = cwd
+	var err error
+	c.path, err = importPathTo(rel)
+	if err != nil {
+		return nil, err
 	}
 
-	// Detect recursion
-	if strings.HasSuffix(c.path, string(os.PathSeparator)+"...") {
-		c.recurse = true
-		c.path = c.path[:len(c.path)-len(string(os.PathSeparator)+"...")]
-	}
 	c.logf("import path: %q before: %q after: %q recursive: %v\n", c.path, beforeRev, afterRev, c.recurse)
 
 	// Parse revisions from VCS into go/ast
 	start := time.Now()
-	var err error
 	if c.b, err = c.parse(beforeRev); err != nil {
+		fmt.Println("fdsa")
 		return nil, err
 	}
 	if c.a, err = c.parse(afterRev); err != nil {
+		fmt.Println("asdf")
 		return nil, err
 	}
 	parse := time.Since(start)
@@ -138,6 +139,72 @@ func (c *Checker) Check(path, beforeRev, afterRev string) ([]Change, error) {
 	c.logf("Changes detected: %v\n", len(changes))
 
 	return changes, nil
+}
+
+func importPathTo(rel string) (string, error) {
+	gopaths := filepath.SplitList(os.Getenv("GOPATH"))
+	for _, gopath := range gopaths {
+		abs, err := filepath.Abs(rel)
+		if err != nil {
+			return "", err
+		}
+		if strings.HasPrefix(abs, gopath) {
+			return abs[len(gopath)+2+len("src"):], nil
+		}
+	}
+	return "", errImportPathNotFound
+}
+
+// RelativePathToTarget returns the relative path to the given path, wether it's
+// an import path or direct path and also returns if the path had recursion
+// requested (/...).
+func RelativePathToTarget(path string) (rel string, recurse bool, err error) {
+	// Detect recursion
+	if strings.HasSuffix(path, string(os.PathSeparator)+"...") {
+		recurse = true
+		path = path[:len(path)-len(string(os.PathSeparator)+"...")]
+	}
+
+	// If path is unset, use local directory
+	if path == "" || path == "." {
+		return ".", recurse, nil
+	}
+
+	if _, err := os.Stat(path); err != nil {
+		if perr, ok := err.(*os.PathError); ok {
+			if serr, ok := perr.Err.(syscall.Errno); ok {
+				if serr == syscall.ENOENT { // we might be given a import path.
+					var err error
+					path, err = findRelativeFromImport(path)
+					if err != nil {
+						return "", false, err
+					}
+					return path, recurse, nil
+				}
+			}
+		}
+		return "", false, err
+	}
+	return path, recurse, nil
+}
+
+func findRelativeFromImport(path string) (string, error) {
+	gopaths := filepath.SplitList(os.Getenv("GOPATH"))
+	for _, gopath := range gopaths {
+		fullpath := filepath.Join(gopath, "src", path)
+		if _, err := os.Stat(fullpath); err == nil {
+			wd, err := os.Getwd()
+			if err != nil {
+				return "", err
+			}
+			rel, err := filepath.Rel(wd, fullpath)
+			if err != nil {
+				return "", err
+			}
+			return rel, nil
+		}
+	}
+	return "", errImportPathNotFound
 }
 
 func (c Checker) logf(format string, a ...interface{}) {
