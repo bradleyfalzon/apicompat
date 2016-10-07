@@ -27,6 +27,10 @@ const cwd = "."
 var (
 	// errSkipPackage is returned by the parser when a package should be skipped.
 	errSkipPackage = errors.New("Skipping package")
+
+	// errNotInGOPATH is returned when the target directory is detected to not
+	// be inside any of the $GOPATH.
+	errNotInGOPATH = errors.New("target directory not in $GOPATH")
 )
 
 // Checker is used to check for changes between two versions of a package.
@@ -159,11 +163,14 @@ func (c Checker) parse(rev string) (pkgs map[string]pkg, err error) {
 	// c.path is either dot or import path
 	paths := []string{c.path}
 	if c.recurse {
+
 		// Technically this isn't correct, GOPATH could be a list
-		var (
-			dir    = filepath.Join(os.Getenv("GOPATH"), "src")
-			prefix = ""
-		)
+		dir, err := findGOPATH(c.path)
+		if err != nil {
+			return nil, err
+		}
+		dir = filepath.Join(dir, "src")
+		var prefix string
 		if c.path == cwd {
 			// could c.path = getwd instead ?
 			if dir, err = os.Getwd(); err != nil {
@@ -200,6 +207,19 @@ func (c Checker) parse(rev string) (pkgs map[string]pkg, err error) {
 		pkgs[p.importPath] = p
 	}
 	return pkgs, nil
+}
+
+func findGOPATH(path string) (string, error) {
+	for _, gopath := range filepath.SplitList(os.Getenv("GOPATH")) {
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return "", err
+		}
+		if strings.HasPrefix(abs, gopath) {
+			return gopath, nil
+		}
+	}
+	return "", errNotInGOPATH
 }
 
 // getDirsRecursive returns relative paths to all subdirectories within base
