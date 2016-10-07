@@ -109,11 +109,9 @@ func (c *Checker) Check(rel string, recurse bool, beforeRev, afterRev string) ([
 	// Parse revisions from VCS into go/ast
 	start := time.Now()
 	if c.b, err = c.parse(beforeRev); err != nil {
-		fmt.Println("fdsa")
 		return nil, err
 	}
 	if c.a, err = c.parse(afterRev); err != nil {
-		fmt.Println("asdf")
 		return nil, err
 	}
 	parse := time.Since(start)
