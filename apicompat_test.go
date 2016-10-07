@@ -32,7 +32,7 @@ func TestParse(t *testing.T) {
 	// Run checks
 	c := New(SetVCS(vcs))
 
-	changes, err := c.Check("", "rev1", "rev2")
+	changes, err := c.Check("", false, "rev1", "rev2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,13 +114,13 @@ func TestPaths(t *testing.T) {
 			t.Errorf("Cannot chdir: %s", err)
 		}
 
-		git, err := NewGit()
+		git, err := NewGit(".")
 		if err != nil {
 			t.Errorf("Cannot get new git: %s", err)
 		}
 		checker := New(SetVCS(git))
 
-		changes, err := checker.Check(test.path, "HEAD~1", "HEAD")
+		changes, err := checker.Check(test.path, false, "HEAD~1", "HEAD")
 		if err != nil {
 			t.Errorf("Check error: %s", err)
 		}
