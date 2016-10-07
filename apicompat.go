@@ -24,6 +24,11 @@ import (
 // go/build understands this as "."
 const cwd = "."
 
+var (
+	// errSkipPackage is returned by the parser when a package should be skipped.
+	errSkipPackage = errors.New("Skipping package")
+)
+
 // Checker is used to check for changes between two versions of a package.
 type Checker struct {
 	vcs         VCS
@@ -184,6 +189,9 @@ func (c Checker) parse(rev string) (pkgs map[string]pkg, err error) {
 
 		p, err := c.parseDir(rev, path)
 		if err != nil {
+			if err == errSkipPackage {
+				continue
+			}
 			// skip errors if we're recursing and the error is no buildable sources
 			if !c.recurse || !strings.Contains(err.Error(), "no buildable") {
 				return pkgs, err
@@ -217,7 +225,6 @@ func (c Checker) getDirsRecursive(base, rev, rel, prefix string) (dirs []string)
 func (c Checker) parseDir(rev, dir string) (pkg, error) {
 
 	// Use go/build to get the list of files relevant for a specific OS and ARCH
-
 	ctx := build.Default
 	ctx.ReadDir = func(dir string) ([]os.FileInfo, error) {
 		return c.vcs.ReadDir(rev, dir)
@@ -235,6 +242,10 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 	ipkg, err := ctx.Import(dir, wd, 0)
 	if err != nil {
 		return pkg{}, fmt.Errorf("go/build error: %v", err)
+	}
+
+	if ipkg.Name == "main" {
+		return pkg{}, errSkipPackage
 	}
 
 	var (
@@ -265,7 +276,6 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 	}
 
 	// Loop through all the parsed files and type check them
-
 	p := pkg{
 		importPath: ipkg.ImportPath,
 		fset:       fset,
