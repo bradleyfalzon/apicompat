@@ -38,11 +38,13 @@ type Git struct {
 }
 
 // NewGit returns a VCS based based on git.
-func NewGit() (*Git, error) {
+func NewGit(path string) (*Git, error) {
 	// Find the directory of .git, assumes git can find it via cwd
-	dir, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd.Dir = path
+	dir, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error running %v: %v output: %q", cmd.Args, err, dir)
 	}
 
 	base := string(bytes.TrimSpace(dir))
