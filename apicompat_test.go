@@ -90,11 +90,13 @@ func TestPaths(t *testing.T) {
 		exp  int    // expected number of changes
 	}{
 		{"", "example.com/lib", 1},
-		{"", "example.com/lib/...", 2},    // recursive and ignore internal/vendor
+		{"", "example.com/lib/...", 2},    // recursive and ignore internal/vendor/main
 		{"", "example.com/lib/b/...", 1},  // empty directory
+		{"", "example.com/lib/main", 0},   // main package
 		{"example.com/lib", "", 1},        // working directory
-		{"example.com/lib", "./...", 2},   // working directory recursive and ignore internal/vendor
+		{"example.com/lib", "./...", 2},   // working directory recursive and ignore internal/vendor/main
 		{"example.com/lib/b", "./...", 1}, // empty working directory
+		{"example.com/lib/main", "", 0},   // main package
 	}
 
 	oldPath := os.Getenv("GOPATH")
