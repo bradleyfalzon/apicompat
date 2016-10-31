@@ -347,9 +347,13 @@ func (c Checker) parseDir(rev, dir string) (pkg, error) {
 			return pkg{}, fmt.Errorf("could not read file %q at revision %q: %s", file, rev, err)
 		}
 
-		filename := file
+		filename, err := filepath.Rel(wd, filepath.Join(ipkg.Dir, file))
+		if err != nil {
+			return pkg{}, fmt.Errorf("could not make path relative for revision %q: %s", rev, err)
+		}
 		if rev != revisionFS {
-			filename = rev + ":" + filepath.Join(ipkg.ImportPath, file)
+			// prefix revision to file's path when reading from vcs and not file system
+			filename = rev + ":" + filename
 		}
 		src, err := parser.ParseFile(fset, filename, contents, 0)
 		if err != nil {
