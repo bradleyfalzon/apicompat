@@ -8,6 +8,12 @@ import (
 	"github.com/bradleyfalzon/apicompat"
 )
 
+const (
+	exitCodeNoError       = 0
+	exitCodeInternalError = 1
+	exitCodeBreaking      = 2
+)
+
 func main() {
 	// TODO print CLI arguments, note that it does support GOARCH, GOOS, GOPATH etc, ./... works too
 	before := flag.String("before", "", "Compare revision before, leave unset for the VCS default or . to bypass VCS and use filesystem version")
@@ -21,14 +27,14 @@ func main() {
 	rel, rec, err := apicompat.RelativePathToTarget(path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(exitCodeInternalError)
 	}
 
 	// TODO make it auto discover
 	git, err := apicompat.NewGit(rel)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "apicompat: %s\n", err)
-		os.Exit(2)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(exitCodeInternalError)
 	}
 
 	args := []func(*apicompat.Checker){apicompat.SetVCS(git)}
@@ -45,13 +51,19 @@ func main() {
 	checker := apicompat.New(args...)
 	changes, err := checker.Check(rel, rec, *before, *after)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "apicompat: %s\n", err)
-		os.Exit(1)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(exitCodeInternalError)
 	}
 
+	exitCode := exitCodeNoError
 	for _, change := range changes {
-		if *allChanges || change.Change == apicompat.Breaking {
-			fmt.Println(change)
+		switch {
+		case change.Change == apicompat.Breaking:
+			exitCode = exitCodeBreaking
+			fmt.Print(change)
+		case *allChanges:
+			fmt.Print(change)
 		}
 	}
+	os.Exit(exitCode)
 }
