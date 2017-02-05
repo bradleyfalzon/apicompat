@@ -1,115 +1,115 @@
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:38: breaking change changed type
 	var AliasedImportChange tmpl.Template
 	var AliasedImportChange tmpl.Template
-rev2:abitest.go:-: breaking change members changed types
+rev2:abitest.go:41: breaking change members changed types
 	type AliasedImportChangeS struct{ T tmpl.Template }
 	type AliasedImportChangeS struct{ T tmpl.Template }
-rev2:abitest.go:-: non-breaking change declaration added
+rev2:abitest.go:23: non-breaking change declaration added
 	const ConstAdded int = 0
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:35: breaking change changed type
 	const ConstChangeType int = 0
 	const ConstChangeType uint = 0
-rev2:abitest.go:-: non-breaking change declaration added
+rev2:abitest.go:19: non-breaking change declaration added
 	const ConstMultiSpecB int = 0
-rev1:abitest.go:-: breaking change declaration removed
+rev1:abitest.go:26: breaking change declaration removed
 	const ConstRemoved int = 0
-rev2:abitest.go:-: breaking change parameter types changed
+rev2:abitest.go:251: breaking change parameter types changed
 	func FuncAddArg()
 	func FuncAddArg(arg1 int)
-rev2:abitest.go:-: breaking change return parameters changed
+rev2:abitest.go:272: breaking change return parameters changed
 	func FuncAddRetMore() error
 	func FuncAddRetMore() (error, bool)
-rev2:abitest.go:-: non-breaking change added a variadic parameter
+rev2:abitest.go:290: non-breaking change added a variadic parameter
 	func FuncAddVariadic()
 	func FuncAddVariadic(_ ...int)
-rev2:abitest.go:-: breaking change parameter types changed
+rev2:abitest.go:257: breaking change parameter types changed
 	func FuncChangeArg(arg1 int)
 	func FuncChangeArg(param uint)
-rev2:abitest.go:-: breaking change parameter types changed
+rev2:abitest.go:260: breaking change parameter types changed
 	func FuncChangeChan(arg1 chan int)
 	func FuncChangeChan(arg1 chan uint)
-rev2:abitest.go:-: breaking change parameter types changed
+rev2:abitest.go:263: breaking change parameter types changed
 	func FuncChangeChanDir(arg1 chan int)
 	func FuncChangeChanDir(arg1 <-chan int)
-rev2:abitest.go:-: breaking change return parameters changed
+rev2:abitest.go:278: breaking change return parameters changed
 	func FuncChangeRet() error
 	func FuncChangeRet() bool
-rev2:abitest.go:-: breaking change return parameters changed
+rev2:abitest.go:279: breaking change return parameters changed
 	func FuncChangeRetStarIdent() *int
 	func FuncChangeRetStarIdent() *uint
-rev2:abitest.go:-: breaking change return parameters changed
+rev2:abitest.go:280: breaking change return parameters changed
 	func FuncChangeRetStarSelector() *bytes.Buffer
 	func FuncChangeRetStarSelector() *bytes.Reader
-rev2:abitest.go:-: non-breaking change change parameter to variadic
+rev2:abitest.go:293: non-breaking change change parameter to variadic
 	func FuncChangeToVariadic(_ int)
 	func FuncChangeToVariadic(_ ...int)
-rev2:abitest.go:-: breaking change parameter types changed
+rev2:abitest.go:296: breaking change parameter types changed
 	func FuncChangeToVariadicDiffType(_ int)
 	func FuncChangeToVariadicDiffType(_ ...uint)
-rev2:abitest.go:-: non-breaking change compatible interface change
+rev2:abitest.go:313: non-breaking change compatible interface change
 	func FuncInterfaceCompatible(_ T3)
 	func FuncInterfaceCompatible(_ T1)
-rev2:abitest.go:-: non-breaking change compatible interface change
+rev2:abitest.go:316: non-breaking change compatible interface change
 	func FuncInterfaceCompatible2(_ io.WriteCloser)
 	func FuncInterfaceCompatible2(_ io.Writer)
-rev2:abitest.go:-: non-breaking change compatible interface change
+rev2:abitest.go:319: non-breaking change compatible interface change
 	func FuncInterfaceCompatible3(_ T2)
 	func FuncInterfaceCompatible3(_ error)
-rev2:abitest.go:-: breaking change parameter types changed
+rev2:abitest.go:310: breaking change parameter types changed
 	func FuncInterfaceIncompatible(_ T1)
 	func FuncInterfaceIncompatible(_ T3)
-rev2:abitest.go:-: breaking change parameter types changed
+rev2:abitest.go:285: breaking change parameter types changed
 	func (_ *FuncRecv) Method1(arg1 int) (ret1 error)
 	func (_ *FuncRecv) Method1(arg1 bool) (ret1 int)
-rev2:abitest.go:-: breaking change parameter types changed
+rev2:abitest.go:286: breaking change parameter types changed
 	func (_ FuncRecv) Method2(arg1 int) (ret1 error)
 	func (_ FuncRecv) Method2(arg1 bool) (ret1 int)
-rev2:abitest.go:-: breaking change parameter types changed
+rev2:abitest.go:254: breaking change parameter types changed
 	func FuncRemArg(arg1 int)
 	func FuncRemArg()
-rev2:abitest.go:-: breaking change removed return parameter
+rev2:abitest.go:275: breaking change removed return parameter
 	func FuncRemRet() error
 	func FuncRemRet()
-rev2:abitest.go:-: breaking change changed spec
+rev2:abitest.go:32: breaking change changed spec
 	const GenDeclSpecChange int = 1
 	type GenDeclSpecChange struct{}
-rev2:abitest.go:-: breaking change changed declaration
+rev2:abitest.go:29: breaking change changed declaration
 	const GenFuncDeclChange int = 1
 	func GenFuncDeclChange()
-rev2:abitest.go:-: breaking change members added
+rev2:abitest.go:209: breaking change members added
 	type IfaceAddMember interface{}
 	type IfaceAddMember interface {
 		Member1(arg1 int) (ret1 bool)
 	}
-rev2:abitest.go:-: breaking change members changed types
+rev2:abitest.go:224: breaking change members changed types
 	type IfaceChangeMemberArg interface {
 		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceChangeMemberArg interface {
 		Member1(arg1 uint) (ret1 bool)
 	}
-rev2:abitest.go:-: breaking change members changed types
+rev2:abitest.go:229: breaking change members changed types
 	type IfaceChangeMemberReturn interface {
 		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceChangeMemberReturn interface {
 		Member1(arg1 int) (ret1 int)
 	}
-rev2:abitest.go:-: breaking change members removed
+rev2:abitest.go:214: breaking change members removed
 	type IfaceRemMember interface {
 		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceRemMember interface{}
-rev2:abitest.go:-: non-breaking change members added
+rev2:abitest.go:135: non-breaking change members added
 	type StructAddMember struct{}
 	type StructAddMember struct {
 		Member1	int
 		Member2	[]int
 	}
-rev2:abitest.go:-: breaking change members changed types
+rev2:abitest.go:166: breaking change members changed types
 	type StructChangeMember struct{ Member1 int }
 	type StructChangeMember struct{ Member1 uint }
-rev2:abitest.go:-: non-breaking change members added
+rev2:abitest.go:144: non-breaking change members added
 	type StructEmbedAddMember struct {
 		Struct
 		*StructPtr
@@ -123,81 +123,81 @@ rev2:abitest.go:-: non-breaking change members added
 		bytes.Buffer
 		*bytes.Reader
 	}
-rev2:abitest.go:-: breaking change members removed
+rev2:abitest.go:154: breaking change members removed
 	type StructRemEmbed struct{ Struct }
 	type StructRemEmbed struct{}
-rev2:abitest.go:-: breaking change members removed
+rev2:abitest.go:149: breaking change members removed
 	type StructRemMember struct{ Member1 int }
 	type StructRemMember struct{}
-rev2:abitest.go:-: breaking change alias changed its underlying type
+rev2:abitest.go:232: breaking change alias changed its underlying type
 	type TypeAlias int
 	type TypeAlias uint
-rev2:abitest.go:-: breaking change changed type of value spec
+rev2:abitest.go:121: breaking change changed type of value spec
 	type TypeSpecChange struct{}
 	type TypeSpecChange interface{}
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:51: breaking change changed type
 	var ValChangeMulti = 1
 	var ValChangeMulti = false
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:50: breaking change changed type
 	var ValChangeMultiZeroState int
 	var ValChangeMultiZeroState uint
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:90: breaking change changed type
 	var VarAddTypeFuncResult func(int)
 	var VarAddTypeFuncResult func(int) error
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:54: breaking change changed type
 	var VarChangeType int
 	var VarChangeType uint
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:102: breaking change changed type
 	var VarChangeTypeArrayLen [1]int
 	var VarChangeTypeArrayLen [2]int
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:105: breaking change changed type
 	var VarChangeTypeArrayType [1]int
 	var VarChangeTypeArrayType [1]uint
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:66: breaking change changed type
 	var VarChangeTypeChan chan int
 	var VarChangeTypeChan chan uint
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:69: breaking change changed type
 	var VarChangeTypeChanDir chan int
 	var VarChangeTypeChanDir <-chan int
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:72: breaking change changed type
 	var VarChangeTypeChanDirRelax <-chan int
 	var VarChangeTypeChanDirRelax chan int
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:84: breaking change changed type
 	var VarChangeTypeFuncParam func(int) error
 	var VarChangeTypeFuncParam func(uint) error
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:87: breaking change changed type
 	var VarChangeTypeFuncResult func(int) error
 	var VarChangeTypeFuncResult func(int) bool
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:108: breaking change changed type
 	var VarChangeTypeMapKey map[int]int
 	var VarChangeTypeMapKey map[uint]int
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:111: breaking change changed type
 	var VarChangeTypeMapValue map[int]int
 	var VarChangeTypeMapValue map[int]uint
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:114: breaking change changed type
 	var VarChangeTypeSelector bytes.Buffer
 	var VarChangeTypeSelector bytes.Reader
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:96: breaking change changed type
 	var VarChangeTypeSlice []int
 	var VarChangeTypeSlice []uint
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:99: breaking change changed type
 	var VarChangeTypeSliceLen []int
 	var VarChangeTypeSliceLen [1]int
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:117: breaking change changed type
 	var VarChangeTypeStar *int
 	var VarChangeTypeStar *uint
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:118: breaking change changed type
 	var VarChangeTypeStarSelector *bytes.Buffer
 	var VarChangeTypeStarSelector *bytes.Reader
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:57: breaking change changed type
 	var VarChangeValSpecType int
 	var VarChangeValSpecType []int
-rev2:abitest.go:-: breaking change changed type
+rev2:abitest.go:93: breaking change changed type
 	var VarRemoveTypeFuncResult func(int) error
 	var VarRemoveTypeFuncResult func(int)
-rev2:abitest.go:-: breaking change members changed types
+rev2:abitest.go:327: breaking change members changed types
 	type s struct{ Member int }
 	type s struct{ Member uint }
-rev2:abitest.go:-: breaking change return parameters changed
+rev2:abitest.go:331: breaking change return parameters changed
 	func (s) F() int
 	func (s) F() uint

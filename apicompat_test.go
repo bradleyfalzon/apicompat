@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"testing"
 )
 
@@ -37,11 +36,10 @@ func TestParse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lineNum := regexp.MustCompile(":[0-9]+:")
 	// Save results to buffer for comparison with gold master
 	var buf bytes.Buffer
 	for _, change := range changes {
-		fmt.Fprint(&buf, lineNum.ReplaceAllString(change.String(), ":-:"))
+		fmt.Fprint(&buf, change)
 	}
 
 	// Overwrite the gold master with go test -args update
