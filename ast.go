@@ -162,10 +162,10 @@ func (c DeclChecker) checkInterface(before, after *ast.InterfaceType, allowRemov
 	r := c.diffFields(keyOnName, before.Methods.List, after.Methods.List)
 	if r.Added() {
 		// Fields were added
-		return breaking("members added", after.Pos()), nil
+		return breaking("members added", r.AddedPos()), nil
 	} else if r.Modified() {
 		// Fields changed types
-		return breaking("members changed types", after.Pos()), nil
+		return breaking("members changed types", r.ModifiedPos()), nil
 	} else if r.Removed() {
 		if allowRemoval {
 			return nonBreaking("members removed", after.Pos()), nil
@@ -209,9 +209,9 @@ func (c DeclChecker) checkStruct(before, after *ast.StructType) (DeclChange, err
 		return breaking("members removed", after.Pos()), nil
 	} else if r.Modified() {
 		// Fields changed types
-		return breaking("members changed types", after.Pos()), nil
+		return breaking("members changed types", r.ModifiedPos()), nil
 	} else if r.Added() {
-		return nonBreaking("members added", after.Pos()), nil
+		return nonBreaking("members added", r.AddedPos()), nil
 	}
 	return none(), nil
 }
@@ -275,6 +275,10 @@ func (d diffResult) Changed() bool {
 func (d diffResult) Added() bool    { return len(d.added) > 0 }
 func (d diffResult) Removed() bool  { return len(d.removed) > 0 }
 func (d diffResult) Modified() bool { return len(d.modified) > 0 }
+
+// No RemovedPos because the removed element's position will not match the after fileset
+func (d diffResult) AddedPos() token.Pos    { return d.added[len(d.added)-1].Pos() }
+func (d diffResult) ModifiedPos() token.Pos { return d.modified[len(d.modified)-1][1].Pos() }
 
 // RemoveVariadicCompatible removes changes and returns a short msg describing
 // the change if the added, removed and changed fields only represent an

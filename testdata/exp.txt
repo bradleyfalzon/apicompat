@@ -76,19 +76,19 @@ rev2:abitest.go:32: breaking change changed spec
 rev2:abitest.go:29: breaking change changed declaration
 	const GenFuncDeclChange int = 1
 	func GenFuncDeclChange()
-rev2:abitest.go:207: breaking change members added
+rev2:abitest.go:208: breaking change members added
 	type IfaceAddMember interface{}
 	type IfaceAddMember interface {
 		Member1(arg1 int) (ret1 bool)
 	}
-rev2:abitest.go:222: breaking change members changed types
+rev2:abitest.go:223: breaking change members changed types
 	type IfaceChangeMemberArg interface {
 		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceChangeMemberArg interface {
 		Member1(arg1 uint) (ret1 bool)
 	}
-rev2:abitest.go:227: breaking change members changed types
+rev2:abitest.go:228: breaking change members changed types
 	type IfaceChangeMemberReturn interface {
 		Member1(arg1 int) (ret1 bool)
 	}
@@ -100,16 +100,16 @@ rev2:abitest.go:212: breaking change members removed
 		Member1(arg1 int) (ret1 bool)
 	}
 	type IfaceRemMember interface{}
-rev2:abitest.go:132: non-breaking change members added
+rev2:abitest.go:134: non-breaking change members added
 	type StructAddMember struct{}
 	type StructAddMember struct {
 		Member1	int
 		Member2	[]int
 	}
-rev2:abitest.go:164: breaking change members changed types
+rev2:abitest.go:165: breaking change members changed types
 	type StructChangeMember struct{ Member1 int }
 	type StructChangeMember struct{ Member1 uint }
-rev2:abitest.go:138: non-breaking change members added
+rev2:abitest.go:139: non-breaking change members added
 	type StructEmbedAddMember struct {
 		Struct
 		*StructPtr
