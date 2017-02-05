@@ -22,8 +22,12 @@ const (
 
 // DeclChange represents a single change between 2 revision.
 type DeclChange struct {
+	// Change is the type of change, see None, NonBreaking and Breaking.
 	Change string
-	Msg    string
+	// Msg describes what changed, such as "members added".
+	Msg string
+	// Pos is the position of the change.
+	Pos token.Pos
 }
 
 // DeclChecker takes a list of changes and verifies which, if any, change breaks
@@ -39,13 +43,13 @@ func NewDeclChecker(bi, ai *types.Info) *DeclChecker {
 }
 
 // nonBreaking returns a DeclChange with the non-breaking change type.
-func nonBreaking(msg string) DeclChange { return DeclChange{NonBreaking, msg} }
+func nonBreaking(msg string, pos token.Pos) DeclChange { return DeclChange{NonBreaking, msg, pos} }
 
 // breaking returns a DeclChange with the breaking change type.
-func breaking(msg string) DeclChange { return DeclChange{Breaking, msg} }
+func breaking(msg string, pos token.Pos) DeclChange { return DeclChange{Breaking, msg, pos} }
 
 // none returns a DeclChange with the no change type.
-func none() DeclChange { return DeclChange{None, ""} }
+func none() DeclChange { return DeclChange{None, "", 0} }
 
 // Check compares two declarations and returns the DeclChange associated with
 // that change. For example, comments aren't compared, names of arguments aren't
@@ -55,7 +59,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (DeclChange, error) {
 
 	if reflect.TypeOf(before) != reflect.TypeOf(after) {
 		// Declaration type changed, such as GenDecl to FuncDecl (eg var/const to func)
-		return breaking("changed declaration"), nil
+		return breaking("changed declaration", after.Pos()), nil
 	}
 
 	switch b := before.(type) {
@@ -66,7 +70,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (DeclChange, error) {
 
 		if reflect.TypeOf(b.Specs[0]) != reflect.TypeOf(a.Specs[0]) {
 			// Spec changed, such as ValueSpec to TypeSpec (eg var/const to struct)
-			return breaking("changed spec"), nil
+			return breaking("changed spec", a.Specs[0].Pos()), nil
 		}
 
 		switch bspec := b.Specs[0].(type) {
@@ -81,7 +85,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (DeclChange, error) {
 				// Inferred types from external packages (inc. stdlib) aren't identical
 				// according to types.Identical(), so compare the string representations
 				if btype.String() != atype.String() {
-					return breaking("changed type"), nil
+					return breaking("changed type", atype.Pos()), nil
 				}
 			}
 		case *ast.TypeSpec:
@@ -90,7 +94,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (DeclChange, error) {
 
 			if reflect.TypeOf(bspec.Type) != reflect.TypeOf(aspec.Type) {
 				// Spec change, such as from StructType to InterfaceType or different aliased types
-				return breaking("changed type of value spec"), nil
+				return breaking("changed type of value spec", aspec.Pos()), nil
 			}
 
 			switch btype := bspec.Type.(type) {
@@ -105,7 +109,7 @@ func (c DeclChecker) Check(before, after ast.Decl) (DeclChange, error) {
 				atype := aspec.Type.(*ast.Ident)
 				if btype.Name != atype.Name {
 					// Alias typing changed underlying types
-					return breaking("alias changed its underlying type"), nil
+					return breaking("alias changed its underlying type", atype.Pos()), nil
 				}
 			}
 		}
@@ -120,16 +124,16 @@ func (c DeclChecker) Check(before, after ast.Decl) (DeclChange, error) {
 
 func (c DeclChecker) checkChan(before, after *ast.ChanType) (DeclChange, error) {
 	if !c.exprEqual(before.Value, after.Value) {
-		return breaking("changed channel's type"), nil
+		return breaking("changed channel's type", after.Pos()), nil
 	}
 
 	// If we're specifying a direction and it's not the same as before
 	// (if we remove direction then that change isn't breaking)
 	if before.Dir != after.Dir {
 		if after.Dir != ast.SEND && after.Dir != ast.RECV {
-			return nonBreaking("removed channel's direction"), nil
+			return nonBreaking("removed channel's direction", after.Pos()), nil
 		}
-		return breaking("changed channel's direction"), nil
+		return breaking("changed channel's direction", after.Pos()), nil
 	}
 	return none(), nil
 }
@@ -158,15 +162,15 @@ func (c DeclChecker) checkInterface(before, after *ast.InterfaceType, allowRemov
 	r := c.diffFields(keyOnName, before.Methods.List, after.Methods.List)
 	if r.Added() {
 		// Fields were added
-		return breaking("members added"), nil
+		return breaking("members added", r.AddedPos()), nil
 	} else if r.Modified() {
 		// Fields changed types
-		return breaking("members changed types"), nil
+		return breaking("members changed types", r.ModifiedPos()), nil
 	} else if r.Removed() {
 		if allowRemoval {
-			return nonBreaking("members removed"), nil
+			return nonBreaking("members removed", after.Pos()), nil
 		}
-		return breaking("members removed"), nil
+		return breaking("members removed", after.Pos()), nil
 	}
 
 	return none(), nil
@@ -202,12 +206,12 @@ func (c DeclChecker) checkStruct(before, after *ast.StructType) (DeclChange, err
 	r := c.diffFields(keyOnName, before.Fields.List, after.Fields.List)
 	if r.Removed() {
 		// Fields were removed
-		return breaking("members removed"), nil
+		return breaking("members removed", after.Pos()), nil
 	} else if r.Modified() {
 		// Fields changed types
-		return breaking("members changed types"), nil
+		return breaking("members changed types", r.ModifiedPos()), nil
 	} else if r.Added() {
-		return nonBreaking("members added"), nil
+		return nonBreaking("members added", r.AddedPos()), nil
 	}
 	return none(), nil
 }
@@ -224,13 +228,13 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (DeclChange, error) 
 		return DeclChange{}, err
 	}
 	if r.Changed() {
-		return breaking("parameter types changed"), nil
+		return breaking("parameter types changed", after.Pos()), nil
 	}
 
 	if before.Results != nil {
 		if after.Results == nil {
 			// removed return parameter
-			return breaking("removed return parameter"), nil
+			return breaking("removed return parameter", after.Pos()), nil
 		}
 
 		// don't compare argument names
@@ -242,16 +246,16 @@ func (c DeclChecker) checkFunc(before, after *ast.FuncType) (DeclChange, error) 
 		if len(before.Results.List) > 0 {
 			r := c.diffFields(keyOnPosition, bresults, aresults)
 			if r.Changed() {
-				return breaking("return parameters changed"), nil
+				return breaking("return parameters changed", after.Pos()), nil
 			}
 		}
 	}
 
 	switch {
 	case interfaceMsg != "":
-		return nonBreaking(interfaceMsg), nil
+		return nonBreaking(interfaceMsg, after.Pos()), nil
 	case variadicMsg != "":
-		return nonBreaking(variadicMsg), nil
+		return nonBreaking(variadicMsg, after.Pos()), nil
 	default:
 		return none(), nil
 	}
@@ -271,6 +275,10 @@ func (d diffResult) Changed() bool {
 func (d diffResult) Added() bool    { return len(d.added) > 0 }
 func (d diffResult) Removed() bool  { return len(d.removed) > 0 }
 func (d diffResult) Modified() bool { return len(d.modified) > 0 }
+
+// No RemovedPos because the removed element's position will not match the after fileset
+func (d diffResult) AddedPos() token.Pos    { return d.added[len(d.added)-1].Pos() }
+func (d diffResult) ModifiedPos() token.Pos { return d.modified[len(d.modified)-1][1].Pos() }
 
 // RemoveVariadicCompatible removes changes and returns a short msg describing
 // the change if the added, removed and changed fields only represent an

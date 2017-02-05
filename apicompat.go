@@ -662,7 +662,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 			aDecl, ok := apkg.decls[id]
 			if !ok {
 				// in before, not in after, therefore it was removed
-				c := Change{Pkg: pkgName, ID: id, Change: Breaking, Msg: "declaration removed", Pos: pos(bpkg.fset, bDecl), Before: bDecl}
+				c := Change{Pkg: pkgName, ID: id, Change: Breaking, Msg: "declaration removed", Pos: pos(bpkg.fset, bDecl.End()), Before: bDecl}
 				changes = append(changes, c)
 				continue
 			}
@@ -682,7 +682,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 				ID:     id,
 				Change: change.Change,
 				Msg:    change.Msg,
-				Pos:    pos(apkg.fset, aDecl),
+				Pos:    pos(apkg.fset, change.Pos),
 				Before: bDecl,
 				After:  aDecl,
 			})
@@ -691,7 +691,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 		for id, aDecl := range apkg.decls {
 			if _, ok := bpkg.decls[id]; !ok {
 				// in after, not in before, therefore it was added
-				c := Change{Pkg: pkgName, ID: id, Change: NonBreaking, Msg: "declaration added", Pos: pos(apkg.fset, aDecl), After: aDecl}
+				c := Change{Pkg: pkgName, ID: id, Change: NonBreaking, Msg: "declaration added", Pos: pos(apkg.fset, aDecl.End()), After: aDecl}
 				changes = append(changes, c)
 			}
 		}
@@ -700,19 +700,7 @@ func (c Checker) compareDecls() ([]Change, error) {
 }
 
 // pos returns the declaration's position within a file.
-//
-// For some reason Pos does not work on a ast.GenDec, it's only working on a
-// ast.FuncDec but I'm not certain why. Fortunately, when Pos is invalid, End()
-// has always been valid, so just use that.
-//
-// TODO fixme, this function shouldn't be required for the above reason.
-// TODO actually we should just return the pos, leave it up to the app to figure it out
-func pos(fset *token.FileSet, decl ast.Decl) string {
-	p := decl.Pos()
-	if !p.IsValid() {
-		p = decl.End()
-	}
-
+func pos(fset *token.FileSet, p token.Pos) string {
 	pos := fset.Position(p)
 	return fmt.Sprintf("%s:%d", pos.Filename, pos.Line)
 }
